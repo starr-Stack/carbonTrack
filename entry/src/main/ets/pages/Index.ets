@@ -10,6 +10,7 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { DBUtil } from '../common/DBUtil';
 import { CarbonRecord } from '../model/TableType';
 import { AppState } from '../model/AppState';
+import { RecordDeleteService, DeleteRecordResult } from '../service/RecordDeleteService';
 
 function pad2(value: number): string {
   return value < 10 ? '0' + value : String(value);
@@ -75,6 +76,49 @@ struct Index {
     } catch (err) {
       this.toast('打开失败');
     }
+  }
+
+  /** 删除前先确认，避免误触 */
+  private confirmDelete(item: CarbonRecord): void {
+    try {
+      this.getUIContext().showAlertDialog({
+        title: '删除记录',
+        message: '确定删除「' + item.itemName + '」吗？今日统计会同步扣减。',
+        autoCancel: true,
+        primaryButton: {
+          value: '取消',
+          action: () => {
+          }
+        },
+        secondaryButton: {
+          value: '删除',
+          fontColor: '#C62828',
+          action: () => {
+            this.removeRecord(item);
+          }
+        }
+      });
+    } catch (err) {
+      this.toast('无法打开确认框');
+    }
+  }
+
+  /** 调用独立服务删除，成功后再刷新页面 */
+  private async removeRecord(item: CarbonRecord): Promise<void> {
+    if (item.id === undefined) {
+      return;
+    }
+    const result: DeleteRecordResult = await RecordDeleteService.deleteRecord(item.id);
+    if (!result.success) {
+      this.toast('删除失败，请重试');
+      return;
+    }
+    // 只有删除的是今天的记录，才扣减今日积分
+    if (result.recordTime.startsWith(todayText())) {
+      AppState.setTodayEarnPoint(Math.max(0, AppState.getTodayEarnPoint() - result.removedPoint));
+    }
+    this.toast('已删除');
+    await this.refresh();
   }
 
   build() {
@@ -156,6 +200,14 @@ struct Index {
                 Text('+' + String(item.getPoint) + ' 分').fontSize(12).fontColor('#F9A825').margin({ top: 2 })
               }
               .alignItems(HorizontalAlign.End)
+
+              Text('删除')
+                .fontSize(12)
+                .fontColor('#C62828')
+                .padding({ left: 12, top: 8, bottom: 8 })
+                .onClick(() => {
+                  this.confirmDelete(item);
+                })
             }
             .width('100%')
             .padding({ top: 12, bottom: 12 })
