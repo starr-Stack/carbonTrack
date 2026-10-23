@@ -89,8 +89,8 @@ struct Index {
       Row() {
         Column() {
           Text('今日减排').fontSize(13).fontColor('#607D8B')
-          Text(this.todayCo2.toFixed(2)).fontSize(30).fontWeight(FontWeight.Bold).fontColor('#2E7D32')
-          Text('kg CO₂e').fontSize(12).fontColor('#90A4AE')
+          Text('≈ ' + this.todayCo2.toFixed(2)).fontSize(30).fontWeight(FontWeight.Bold).fontColor('#2E7D32')
+          Text('kg CO₂e · 按实际值').fontSize(12).fontColor('#90A4AE')
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
