@@ -1,0 +1,38 @@
+[
+  {
+    "taskId": "T001",
+    "taskName": "低碳第一步",
+    "taskDesc": "记录你的第一条低碳行为，迈出减碳生活的第一步。",
+    "targetDesc": "累计记录 1 条低碳行为",
+    "rewardPoint": 20,
+    "bindBadgeId": "B001",
+    "taskType": "record"
+  },
+  {
+    "taskId": "T002",
+    "taskName": "绿色出行",
+    "taskDesc": "步行、骑行或乘坐公共交通代替燃油私家车，短途出行也能减碳。",
+    "targetDesc": "累计完成 3 次出行类低碳记录",
+    "rewardPoint": 40,
+    "bindBadgeId": "B002",
+    "taskType": "travel"
+  },
+  {
+    "taskId": "T003",
+    "taskName": "节电小能手",
+    "taskDesc": "随手关灯、调高空调温度、拔掉待机电器，把每一度电用在需要的地方。",
+    "targetDesc": "累计完成 3 次节电类低碳记录",
+    "rewardPoint": 30,
+    "bindBadgeId": "B003",
+    "taskType": "electricity"
+  },
+  {
+    "taskId": "T004",
+    "taskName": "减碳一公斤",
+    "taskDesc": "把日常低碳行为攒起来，累计减排量达到 1 公斤二氧化碳当量。",
+    "targetDesc": "累计减排量达到 1.00 kgCO2e",
+    "rewardPoint": 50,
+    "bindBadgeId": "B004",
+    "taskType": "co2"
+  }
+]
