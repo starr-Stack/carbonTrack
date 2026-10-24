@@ -3,6 +3,8 @@
     "pages/Index",
     "pages/AddRecord",
     "pages/TaskList",
-    "pages/BadgeList"
+    "pages/BadgeList",
+    "pages/ArticleList",
+    "pages/ArticleDetail"
   ]
 }
