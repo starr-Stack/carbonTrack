@@ -131,6 +131,16 @@ struct Index {
       this.toast('打开科普失败');
     }
   }
+  /** 打开数据管理 */
+  private openDataManage(): void {
+    try {
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/DataManage' }).catch((err: BusinessError) => {
+        this.toast('打开数据管理失败：' + err.message);
+      });
+    } catch (err) {
+      this.toast('打开数据管理失败');
+    }
+  }
   /** 删除前先确认，避免误触 */
   private confirmDelete(item: CarbonRecord): void {
     try {
@@ -266,6 +276,15 @@ struct Index {
       }
       .width('100%')
       .margin({ top: 10 })
+      Button('数据管理 →')
+        .width('100%')
+        .height(44)
+        .margin({ top: 10 })
+        .backgroundColor('#E8F5E9')
+        .fontColor('#2E7D32')
+        .onClick(() => {
+          this.openDataManage();
+        })
 
       Row() {
         Text('今日记录').fontSize(17).fontWeight(FontWeight.Bold).fontColor('#263238')
