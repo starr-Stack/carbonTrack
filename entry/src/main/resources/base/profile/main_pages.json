@@ -3,6 +3,7 @@
     "pages/Index",
     "pages/AddRecord",
     "pages/Dashboard",
+    "pages/History",
     "pages/TaskList",
     "pages/BadgeList",
     "pages/ArticleList",
