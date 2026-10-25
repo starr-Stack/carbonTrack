@@ -1,0 +1,23 @@
+[
+  {
+    "articleId": "A001",
+    "title": "一文读懂「双碳」：碳达峰与碳中和",
+    "summary": "碳达峰和碳中和到底指什么？为什么是 2030 和 2060 两个时间点？用五分钟把概念、路线图和三个常见误区讲清楚。",
+    "tag": "概念科普",
+    "contentRawPath": "article_01_twin_carbon.txt"
+  },
+  {
+    "articleId": "A002",
+    "title": "一度电、一公里：你的碳足迹是怎么算出来的",
+    "summary": "排放因子、二氧化碳当量、分省电网差异——把「减碳 0.192 公斤」背后的算法拆开看，顺带列出生活场景的典型数值。",
+    "tag": "核算科普",
+    "contentRawPath": "article_02_carbon_footprint.txt"
+  },
+  {
+    "articleId": "A003",
+    "title": "碳市场与碳普惠：减排量如何变成收益",
+    "summary": "碳市场给排放定价，碳普惠把个人减排量化成激励。看懂 CCER、绿证，以及本应用积分规则的来龙去脉。",
+    "tag": "政策与市场",
+    "contentRawPath": "article_03_carbon_market.txt"
+  }
+]

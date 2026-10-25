@@ -1,0 +1,30 @@
+[
+  {
+    "badgeId": "B001",
+    "badgeName": "低碳新手",
+    "badgeDesc": "完成第一次低碳行为记录，正式加入减碳行动。",
+    "iconRes": "ic_badge_newbie",
+    "bindTaskIdList": ["T001"]
+  },
+  {
+    "badgeId": "B002",
+    "badgeName": "绿色出行者",
+    "badgeDesc": "坚持用步行、骑行和公共交通替代燃油私家车，让每一次出行都更轻。",
+    "iconRes": "ic_badge_green_travel",
+    "bindTaskIdList": ["T002"]
+  },
+  {
+    "badgeId": "B003",
+    "badgeName": "节电达人",
+    "badgeDesc": "把随手关灯、调高空调温度变成习惯，用更少的电做同样的事。",
+    "iconRes": "ic_badge_power_saver",
+    "bindTaskIdList": ["T003"]
+  },
+  {
+    "badgeId": "B004",
+    "badgeName": "减碳先锋",
+    "badgeDesc": "累计减排达到 1 公斤二氧化碳当量，把日常小事攒成看得见的减碳成果。",
+    "iconRes": "ic_badge_carbon_pioneer",
+    "bindTaskIdList": ["T004"]
+  }
+]
