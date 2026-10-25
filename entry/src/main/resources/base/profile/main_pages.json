@@ -8,6 +8,7 @@
     "pages/BadgeList",
     "pages/ArticleList",
     "pages/ArticleDetail",
-    "pages/DataManage"
+    "pages/DataManage",
+    "pages/TreeCertificate"
   ]
 }

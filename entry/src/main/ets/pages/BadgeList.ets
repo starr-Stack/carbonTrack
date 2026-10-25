@@ -4,14 +4,14 @@
  * 功能：徽章展示页。读取 rawfile/badge_init.json 渲染徽章网格，
  *       未解锁徽章置灰弱化、已解锁徽章高亮，点击卡片弹出详情弹窗。
  *
- * 职责边界（重要）：
- *   1. 本页不做任何 RdbStore 读写、不建表、不写 SQL、不定义数据库实体；
- *      任务领奖状态、徽章解锁记录的读写全部由队友 A 的公共数据层提供；
- *   2. 解锁判定全部交给 utils/BadgeUnlockUtil.ets（纯函数），页面只负责组装与展示；
+ * 职责边界：
+ *   1. 徽章元数据来自 rawfile/badge_init.json；解锁判定交给
+ *      utils/BadgeUnlockUtil.ets（纯函数），解锁记录通过 service/BadgeService 持久化；
+ *   2. 任务领奖状态通过 service/TaskService 读取，本页不写 SQL、不操作 RdbStore；
  *   3. 数据来源：
  *      - badge_init.json：徽章元数据（id / 名称 / 描述 / 图标资源名 / 绑定任务）
  *      - task_init.json ：只用于把 taskId 映射成任务名，读不到时退化为显示 taskId
- *      - mockTaskClaimStates()：任务领奖状态【占位实现】，待接入 A 的接口
+ *      - TaskService.getClaimedTaskIds()：已领奖任务 -> 徽章解锁判定输入
  *   4. 样式（底色 #F1F3F5、白卡 16 圆角、主色 #2E7D32、金色 #F9A825、字号与间距）
  *      与 TaskList.ets、Index.ets 保持一致，不引入任何第三方依赖。
  */
@@ -63,7 +63,7 @@ interface BadgeView {
   bindTaskNames: string[];
   /** 仍未领奖的任务名，未解锁时提示“还差哪几个” */
   pendingTaskNames: string[];
-  /** 解锁时间：占位阶段为空串，接入 A 的接口后填充 */
+  /** 解锁时间文案：数据库目前只返回已解锁的 badgeId，暂取不到时间戳，先留空显示为「—」 */
   unlockTime: string;
 }
 
@@ -94,7 +94,7 @@ struct BadgeList {
   @State detailVisible: boolean = false;
   /** 当前弹窗展示的徽章 */
   @State detailBadge: BadgeView = EMPTY_BADGE;
-  /** 已持久化的解锁记录（占位：真实数据由 A 的接口返回，这里仅模拟去重） */
+  /** 已持久化的解锁记录，用于判断哪些是本次新解锁的，避免重复写库 */
   @State persistedBadgeIds: string[] = [];
 
   /** 每次回到本页都重新判定一次，保证从任务页领奖返回后状态立即刷新 */
@@ -211,16 +211,9 @@ struct BadgeList {
     return states;
   }
   /**
-   * 记录本次新解锁的徽章。
-   *
-   * ======================== 持久化占位 ========================
-   * TODO(A 的接口就绪后)：在此调用 A 的徽章解锁记录接口，把 newlyUnlocked 批量写入
-   * 徽章解锁表（同一事务写入；对已存在的 badgeId 要幂等，重复调用不能产生重复记录）。
-   * 本页面不写 SQL、不操作 RdbStore、不建表。
-   * 示例：
-   *   const saved: boolean = await A的数据层.saveBadgeUnlock(newlyUnlocked);
-   *   if (!saved) { 记录日志并保留按钮，允许下次重试 }
-   * ==========================================================
+   * 把本次新解锁的徽章写入数据库。
+   * 只写「已解锁但库里还没有」的部分，BadgeService 内部按 badgeId 去重并放在同一事务里，
+   * 所以重复进入页面也不会产生重复记录。
    */
   private async persistNewlyUnlocked(list: BadgeView[]): Promise<void> {
     const inputs: BadgeUnlockInput[] = [];
@@ -262,8 +255,7 @@ struct BadgeList {
     this.goTaskPage();
   }
 
-  private goTaskPage(): void {
-    try {
+  private goTaskPage(): void {    try {
       this.getUIContext().getRouter().pushUrl({ url: 'pages/TaskList' }).catch(() => {
         // 跳转失败时停留在当前页
       });
@@ -280,6 +272,16 @@ struct BadgeList {
     }
   }
 
+  /** 打开植树证书页：把累计减排量折合成种下的树 */
+  private goTreeCertificate(): void {
+    try {
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/TreeCertificate' }).catch(() => {
+        // 跳转失败时停留在当前页
+      });
+    } catch (err) {
+      // 忽略
+    }
+  }
 
   /* ============================ 工具方法 ============================ */
 
@@ -567,6 +569,37 @@ struct BadgeList {
         .padding(18)
         .backgroundColor(COLOR_CARD)
         .borderRadius(16)
+
+        // 植树证书入口：把累计减排量折合成种下的树，入口放在徽章页，拿到成就后顺手看一眼
+        Row() {
+          Text('🌳')
+            .fontSize(26)
+          Column() {
+            Text('植树证书')
+              .fontSize(15)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(COLOR_TITLE)
+            Text('把累计减排量折合成种下的树')
+              .fontSize(11)
+              .fontColor(COLOR_MUTED)
+              .margin({ top: 2 })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+          .margin({ left: 10 })
+          Text('›')
+            .fontSize(18)
+            .fontColor(COLOR_HINT)
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(COLOR_CARD)
+        .borderRadius(16)
+        .margin({ top: 12 })
+        .alignItems(VerticalAlign.Center)
+        .onClick(() => {
+          this.goTreeCertificate();
+        })
 
         // 内容区
         if (this.loadState === 0) {
