@@ -1,18 +1,17 @@
 /*
  * 文件名：BackupService.ets
- * 功能：本地数据备份 / 恢复 + 统计报表导出。
+ * 功能：本地数据备份 + 统计报表导出。
  *
  * 设计说明：
  *   1. 备份内容：carbon_record、user_info、daily_point_summary、task_list、badge 五张表；
- *   2. 备份格式：JSON，带 app 标识和 schemaVersion，恢复前校验，避免导入错文件；
- *   3. 恢复：在同一个事务里清空并重新写入五张表，失败整体回滚；
- *   4. 保存位置：通过系统文件选择器让用户选择（如下载目录），不依赖额外权限；
- *   5. 报表：CSV（带 BOM，Excel 打开不乱码），按时间倒序导出全部减碳记录。
+ *   2. 备份格式：JSON，带 app 标识和 schemaVersion，便于识别；
+ *
+ *   3. 保存位置：通过系统文件选择器让用户选择（如下载目录），不依赖额外权限；
+ *   4. 报表：CSV（带 BOM，Excel 打开不乱码），按时间倒序导出全部减碳记录。
  */
 
 import { common } from '@kit.AbilityKit';
 import { picker, fileIo as fs } from '@kit.CoreFileKit';
-import { util } from '@kit.ArkTS';
 import { relationalStore as rdb } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { TABLE } from '../model/TableType';
@@ -20,7 +19,7 @@ import { DBUtil } from '../common/DBUtil';
 
 const LOG_DOMAIN: number = 0x3200;
 const LOG_TAG: string = 'BackupService';
-/** 备份文件标识，恢复时校验 */
+/** 备份文件标识 */
 const APP_TAG: string = 'CarbonTrack';
 /** 与 TableType.SCHEMA_VERSION 对应 */
 const BACKUP_SCHEMA: number = 2;
@@ -35,15 +34,6 @@ interface BackupPayload {
   daily_point_summary: Array<rdb.ValuesBucket>;
   task_list: Array<rdb.ValuesBucket>;
   badge: Array<rdb.ValuesBucket>;
-}
-
-/** 恢复结果 */
-export interface RestoreResult {
-  ok: boolean;
-  /** 恢复的总行数，失败为 0 */
-  rows: number;
-  /** 失败原因，成功为空 */
-  message: string;
 }
 
 export class BackupService {
@@ -120,82 +110,6 @@ export class BackupService {
     return true;
   }
 
-  /**
-   * 弹出系统选择框，读取备份文件并恢复
-   */
-  public static async pickAndRestore(context: common.Context): Promise<RestoreResult> {
-    const failed: RestoreResult = { ok: false, rows: 0, message: '' };
-    const options = new picker.DocumentSelectOptions();
-    options.maxSelectNumber = 1;
-    const documentPicker = new picker.DocumentViewPicker(context);
-    const uris: string[] = await documentPicker.select(options);
-    if (uris === undefined || uris.length === 0) {
-      failed.message = '已取消';
-      return failed;
-    }
-
-    let payload: BackupPayload;
-    try {
-      const text: string = BackupService.readTextFromUri(uris[0]);
-      payload = JSON.parse(text) as BackupPayload;
-    } catch (err) {
-      failed.message = '文件读取或解析失败';
-      return failed;
-    }
-
-    if (payload.app !== APP_TAG) {
-      failed.message = '不是本应用的备份文件';
-      return failed;
-    }
-
-    const total: number = payload.carbon_record.length + payload.user_info.length +
-      payload.daily_point_summary.length + payload.task_list.length + payload.badge.length;
-
-    const committed: boolean = await DBUtil.runInTransaction(async (store: rdb.RdbStore) => {
-      await BackupService.replaceTable(store, TABLE.carbon_record, payload.carbon_record);
-      await BackupService.replaceTable(store, TABLE.user_info, payload.user_info);
-      await BackupService.replaceTable(store, TABLE.daily_point_summary, payload.daily_point_summary);
-      await BackupService.replaceTable(store, TABLE.task_list, payload.task_list);
-      await BackupService.replaceTable(store, TABLE.badge, payload.badge);
-    });
-
-    if (!committed) {
-      failed.message = '写入数据库失败，已回滚';
-      return failed;
-    }
-    hilog.info(LOG_DOMAIN, LOG_TAG, 'restored rows=%{public}d', total);
-    return { ok: true, rows: total, message: '' };
-  }
-
-  /** 通过文件描述符读取文本，兼容文件选择器返回的 URI */
-  private static readTextFromUri(uri: string): string {
-    const file = fs.openSync(uri, fs.OpenMode.READ_ONLY);
-    try {
-      const stat = fs.statSync(file.fd);
-      const buffer = new ArrayBuffer(stat.size);
-      fs.readSync(file.fd, buffer);
-      const decoder: util.TextDecoder = util.TextDecoder.create('utf-8', { ignoreBOM: true });
-      return decoder.decodeToString(new Uint8Array(buffer));
-    } finally {
-      fs.closeSync(file);
-    }
-  }
-
-  /** 清空并写入一张表 */
-  private static async replaceTable(store: rdb.RdbStore, table: string,
-    rows: Array<rdb.ValuesBucket>): Promise<void> {
-    try {
-      await store.delete(new rdb.RdbPredicates(table));
-      for (const row of rows) {
-        await store.insert(table, row);
-      }
-    } catch (err) {
-      hilog.error(LOG_DOMAIN, LOG_TAG, 'replaceTable %{public}s failed: %{public}s',
-        table, BackupService.describe(err));
-      throw err as Error;
-    }
-  }
-
   /** 查整张表 */
   private static async queryAll(table: string): Promise<Array<rdb.ValuesBucket>> {
     return await DBUtil.query(table, new rdb.RdbPredicates(table));
@@ -232,10 +146,4 @@ export class BackupService {
     return typeof value === 'number' ? value : 0;
   }
 
-  private static describe(err: Object): string {
-    if (err instanceof Error) {
-      return err.message;
-    }
-    return String(err);
-  }
 }

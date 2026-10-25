@@ -1,16 +1,16 @@
 /*
  * 文件名：DataManage.ets
- * 功能：本地数据管理页——备份、恢复、统计报表导出。
+ * 功能：本地数据管理页——备份与统计报表导出。
  *
  * 说明：
- *   1. 备份/恢复/导出都通过系统文件选择器选择保存或读取位置；
- *   2. 备份文件为 JSON（五张表），恢复前会校验文件来源并在事务里整体替换；
+ *   1. 备份/导出都通过系统文件选择器选择保存位置；
+ *   2. 备份文件为 JSON（五张表），带 app 标识和版本号；
  *   3. 报表为 CSV，带 BOM，Excel 直接打开不乱码；
  *   4. 页面只负责交互与提示，具体读写由 service/BackupService 完成。
  */
 
 import { common } from '@kit.AbilityKit';
-import { BackupService, RestoreResult } from '../service/BackupService';
+import { BackupService } from '../service/BackupService';
 
 @Entry
 @Component
@@ -61,63 +61,6 @@ struct DataManage {
     } catch (err) {
       const message: string = err instanceof Error ? err.message : String(err);
       this.status = '备份失败：' + message;
-      this.toast(this.status);
-    }
-    this.working = false;
-  }
-
-  /** 恢复前二次确认 */
-  private confirmRestore(): void {
-    try {
-      this.getUIContext().showAlertDialog({
-        title: '恢复备份',
-        message: '恢复会用备份内容覆盖当前全部数据（减碳记录、积分、任务、徽章），确定继续吗？',
-        autoCancel: true,
-        primaryButton: {
-          value: '取消',
-          action: () => {
-          }
-        },
-        secondaryButton: {
-          value: '选择备份文件',
-          fontColor: '#C62828',
-          action: () => {
-            this.doRestore();
-          }
-        }
-      });
-    } catch (err) {
-      this.toast('无法打开确认框');
-    }
-  }
-
-  /** 选择备份文件并恢复 */
-  private async doRestore(): Promise<void> {
-    if (this.working) {
-      return;
-    }
-    const context: common.Context | undefined = this.hostContext();
-    if (context === undefined) {
-      this.toast('无法获取应用上下文');
-      return;
-    }
-    this.working = true;
-    this.status = '正在恢复…';
-    try {
-      const result: RestoreResult = await BackupService.pickAndRestore(context);
-      if (result.ok) {
-        this.status = '恢复成功，共 ' + String(result.rows) + ' 行。请重启应用查看。';
-        this.toast('恢复成功，请重启应用');
-      } else if (result.message === '已取消') {
-        this.status = '已取消恢复';
-        this.toast('已取消');
-      } else {
-        this.status = '恢复失败：' + result.message;
-        this.toast(this.status);
-      }
-    } catch (err) {
-      const message: string = err instanceof Error ? err.message : String(err);
-      this.status = '恢复失败：' + message;
       this.toast(this.status);
     }
     this.working = false;
@@ -196,32 +139,6 @@ struct DataManage {
           .backgroundColor(Color.White)
           .borderRadius(16)
 
-          // 恢复
-          Column() {
-            Text('恢复备份')
-              .fontSize(16)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#263238')
-            Text('从之前导出的 JSON 备份恢复数据。恢复会覆盖当前全部数据，请谨慎操作。')
-              .fontSize(12)
-              .fontColor('#607D8B')
-              .margin({ top: 6, bottom: 12 })
-            Button(this.working ? '处理中…' : '选择备份文件恢复')
-              .width('100%')
-              .height(44)
-              .backgroundColor('#FFF3E0')
-              .fontColor('#EF6C00')
-              .enabled(!this.working)
-              .onClick(() => {
-                this.confirmRestore();
-              })
-          }
-          .width('100%')
-          .padding(16)
-          .backgroundColor(Color.White)
-          .borderRadius(16)
-          .margin({ top: 12 })
-
           // 报表
           Column() {
             Text('导出统计报表')
@@ -257,7 +174,7 @@ struct DataManage {
               .margin({ top: 16 })
           }
 
-          Text('提示：备份和报表通过系统文件选择器保存，可选择下载目录；恢复会覆盖当前数据，操作前建议先备份。')
+          Text('提示：备份和报表通过系统文件选择器保存，可选择下载目录。')
             .fontSize(11)
             .fontColor('#90A4AE')
             .width('100%')
