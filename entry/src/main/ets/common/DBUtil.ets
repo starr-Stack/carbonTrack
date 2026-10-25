@@ -506,10 +506,52 @@ export class DBUtil {
     // if (current < 2) {
     //   await store.executeSql("ALTER TABLE carbon_record ADD COLUMN source TEXT DEFAULT ''");
     // }
-    store.version = SCHEMA_VERSION;
+    // v1 -> v2：任务领奖与徽章解锁需要的字段
+    if (current < 2) {
+      await DBUtil.addColumnIfMissing(store, TABLE.task_list, 'taskId', 'TEXT');
+      await DBUtil.addColumnIfMissing(store, TABLE.task_list, 'rewardPoint', 'INTEGER');
+      await DBUtil.addColumnIfMissing(store, TABLE.task_list, 'claimedAt', 'INTEGER');
+      await DBUtil.addColumnIfMissing(store, TABLE.badge, 'badgeId', 'TEXT');
+      await DBUtil.addColumnIfMissing(store, TABLE.badge, 'unlockedAt', 'INTEGER');
+    }    store.version = SCHEMA_VERSION;
     hilog.info(LOG_DOMAIN, LOG_TAG, 'schema migrated: %{public}d -> %{public}d', current, SCHEMA_VERSION);
   }
 
+  /** 表中是否已经存在某一列（用于安全迁移） */
+  private static async columnExists(store: rdb.RdbStore, table: string, column: string): Promise<boolean> {
+    let rs: rdb.ResultSet | undefined = undefined;
+    try {
+      rs = await store.querySql('PRAGMA table_info(' + table + ')');
+      while (rs.goToNextRow()) {
+        const row: rdb.ValuesBucket = rs.getRow();
+        if (row['name'] === column) {
+          return true;
+        }
+      }
+      return false;
+    } catch (err) {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'columnExists failed: %{public}s', DBUtil.describe(err));
+      return false;
+    } finally {
+      DBUtil.closeQuietly(rs);
+    }
+  }
+
+  /** 缺列时补列，已存在则跳过 */
+  private static async addColumnIfMissing(store: rdb.RdbStore, table: string,
+    column: string, sqlType: string): Promise<void> {
+    const exists: boolean = await DBUtil.columnExists(store, table, column);
+    if (exists) {
+      return;
+    }
+    try {
+      await store.executeSql('ALTER TABLE ' + table + ' ADD COLUMN ' + column + ' ' + sqlType);
+      hilog.info(LOG_DOMAIN, LOG_TAG, 'added column %{public}s.%{public}s', table, column);
+    } catch (err) {
+      hilog.error(LOG_DOMAIN, LOG_TAG, 'addColumn failed: %{public}s', DBUtil.describe(err));
+      throw err as Error;
+    }
+  }
   /** 根据 TABLE_DEFS 建表，可重复执行 */
   private static async createAllTables(store: rdb.RdbStore): Promise<void> {
     try {

@@ -62,7 +62,7 @@ export interface TableDef {
 }
 
 /** 当前数据库结构版本。每次改表结构必须 +1 */
-export const SCHEMA_VERSION: number = 1;
+export const SCHEMA_VERSION: number = 2;
 
 /** 所有表的列定义，数组顺序就是建表顺序 */
 export const TABLE_DEFS: TableDef[] = [
@@ -107,14 +107,19 @@ export const TABLE_DEFS: TableDef[] = [
     columns: [
       { name: 'id', sqlType: 'INTEGER', constraint: 'PRIMARY KEY AUTOINCREMENT' },
       { name: 'taskName', sqlType: 'TEXT', constraint: '' },
-      { name: 'finish', sqlType: 'INTEGER', constraint: '' }
+      { name: 'finish', sqlType: 'INTEGER', constraint: '' },
+      { name: 'taskId', sqlType: 'TEXT', constraint: '' },
+      { name: 'rewardPoint', sqlType: 'INTEGER', constraint: 'DEFAULT 0' },
+      { name: 'claimedAt', sqlType: 'INTEGER', constraint: 'DEFAULT 0' }
     ]
   },
   {
     name: TABLE.badge,
     columns: [
       { name: 'id', sqlType: 'INTEGER', constraint: 'PRIMARY KEY AUTOINCREMENT' },
-      { name: 'badgeName', sqlType: 'TEXT', constraint: '' }
+      { name: 'badgeName', sqlType: 'TEXT', constraint: '' },
+      { name: 'badgeId', sqlType: 'TEXT', constraint: '' },
+      { name: 'unlockedAt', sqlType: 'INTEGER', constraint: 'DEFAULT 0' }
     ]
   },
   {

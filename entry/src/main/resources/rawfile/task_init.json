@@ -6,7 +6,8 @@
     "targetDesc": "累计记录 1 条低碳行为",
     "rewardPoint": 20,
     "bindBadgeId": "B001",
-    "taskType": "record"
+    "taskType": "record",
+    "targetValue": 1
   },
   {
     "taskId": "T002",
@@ -15,7 +16,8 @@
     "targetDesc": "累计完成 3 次出行类低碳记录",
     "rewardPoint": 40,
     "bindBadgeId": "B002",
-    "taskType": "travel"
+    "taskType": "travel",
+    "targetValue": 3
   },
   {
     "taskId": "T003",
@@ -24,7 +26,8 @@
     "targetDesc": "累计完成 3 次节电类低碳记录",
     "rewardPoint": 30,
     "bindBadgeId": "B003",
-    "taskType": "electricity"
+    "taskType": "electricity",
+    "targetValue": 3
   },
   {
     "taskId": "T004",
@@ -33,6 +36,7 @@
     "targetDesc": "累计减排量达到 1.00 kgCO2e",
     "rewardPoint": 50,
     "bindBadgeId": "B004",
-    "taskType": "co2"
+    "taskType": "co2",
+    "targetValue": 1
   }
 ]

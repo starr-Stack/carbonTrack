@@ -99,6 +99,38 @@ struct Index {
       this.toast('打开历史记录失败');
     }
   }
+  /** 打开低碳任务 */
+  private openTasks(): void {
+    try {
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/TaskList' }).catch((err: BusinessError) => {
+        this.toast('打开任务失败：' + err.message);
+      });
+    } catch (err) {
+      this.toast('打开任务失败');
+    }
+  }
+
+  /** 打开徽章 */
+  private openBadges(): void {
+    try {
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/BadgeList' }).catch((err: BusinessError) => {
+        this.toast('打开徽章失败：' + err.message);
+      });
+    } catch (err) {
+      this.toast('打开徽章失败');
+    }
+  }
+
+  /** 打开科普 */
+  private openArticles(): void {
+    try {
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/ArticleList' }).catch((err: BusinessError) => {
+        this.toast('打开科普失败：' + err.message);
+      });
+    } catch (err) {
+      this.toast('打开科普失败');
+    }
+  }
   /** 删除前先确认，避免误触 */
   private confirmDelete(item: CarbonRecord): void {
     try {
@@ -201,6 +233,39 @@ struct Index {
         .onClick(() => {
           this.openHistory();
         })
+      Row() {
+        Button('低碳任务')
+          .layoutWeight(1)
+          .height(40)
+          .fontSize(13)
+          .backgroundColor('#E8F5E9')
+          .fontColor('#2E7D32')
+          .onClick(() => {
+            this.openTasks();
+          })
+        Button('我的徽章')
+          .layoutWeight(1)
+          .height(40)
+          .fontSize(13)
+          .margin({ left: 8 })
+          .backgroundColor('#E8F5E9')
+          .fontColor('#2E7D32')
+          .onClick(() => {
+            this.openBadges();
+          })
+        Button('双碳科普')
+          .layoutWeight(1)
+          .height(40)
+          .fontSize(13)
+          .margin({ left: 8 })
+          .backgroundColor('#E8F5E9')
+          .fontColor('#2E7D32')
+          .onClick(() => {
+            this.openArticles();
+          })
+      }
+      .width('100%')
+      .margin({ top: 10 })
 
       Row() {
         Text('今日记录').fontSize(17).fontWeight(FontWeight.Bold).fontColor('#263238')

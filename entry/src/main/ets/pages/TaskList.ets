@@ -16,6 +16,8 @@
 import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { AppState } from '../model/AppState';
+import { TaskService, TaskProgress } from '../service/TaskService';
 
 const LOG_DOMAIN: number = 0x3200;
 const LOG_TAG: string = 'TaskList';
@@ -69,6 +71,7 @@ interface TaskInitItem {
   rewardPoint?: number;
   bindBadgeId?: string;
   taskType?: string;
+  targetValue?: number;
 }
 
 /** 任务卡片的展示模型（页面内部组装，不对应任何数据表） */
@@ -95,34 +98,6 @@ interface TaskCardItem {
   status: number;
 }
 
-/** 进度查询结果（占位接口的返回结构，接入 A 的接口后可直接复用） */
-interface TaskProgressData {
-  current: number;
-  target: number;
-}
-
-/** 占位进度表的结构 */
-interface MockProgressItem {
-  taskId: string;
-  current: number;
-  target: number;
-}
-
-/**
- * 【临时占位数据】任务进度表。
- * 作用：公共数据层接口就绪前，让页面能正常渲染三种状态，便于先验收 UI。
- * 删除时机：queryProgress() 改为调用 A 的接口后，本常量连同 MockProgressItem 一起删掉。
- */
-const MOCK_PROGRESS_LIST: MockProgressItem[] = [
-  // T001 已完成：1/1，展示【领取积分】按钮
-  { taskId: 'T001', current: 1, target: 1 },
-  // T002 进行中：2/3，展示进度条与百分比
-  { taskId: 'T002', current: 2, target: 3 },
-  // T003 未开始：0/3
-  { taskId: 'T003', current: 0, target: 3 },
-  // T004 已完成：减排量类任务，1.00/1.00 kg
-  { taskId: 'T004', current: 1, target: 1 }
-];
 
 @Entry
 @Component
@@ -148,7 +123,7 @@ struct TaskList {
    * 读取 rawfile 配置并组装卡片。
    * 失败时不抛异常，切到错误态并给出重试入口，避免白屏。
    */
-  private loadTasks(): void {
+  private async loadTasks(): Promise<void> {
     this.loadState = 0;
     this.errorMsg = '';
     try {
@@ -169,6 +144,9 @@ struct TaskList {
         throw new Error('task_init.json 没有任何任务');
       }
 
+      // 先取已领奖任务，避免卡片先渲染成"可领取"
+      this.claimedTaskIds = await TaskService.getClaimedTaskIds();
+
       const cards: TaskCardItem[] = [];
       for (const item of parsed) {
         const taskId: string = item.taskId ?? '';
@@ -177,7 +155,7 @@ struct TaskList {
           hilog.warn(LOG_DOMAIN, LOG_TAG, 'skip task without taskId');
           continue;
         }
-        const progress: TaskProgressData = this.queryProgress(taskId);
+        const progress: TaskProgress = await TaskService.getProgress(item.taskType ?? '', item.targetValue ?? 0);
         const target: number = progress.target > 0 ? progress.target : 1;
         const current: number = progress.current < 0 ? 0 : progress.current;
         cards.push({
@@ -201,25 +179,6 @@ struct TaskList {
       this.loadState = 2;
       hilog.error(LOG_DOMAIN, LOG_TAG, 'load task_init.json failed: %{public}s', this.errorMsg);
     }
-  }
-
-  /**
-   * 查询单个任务的进度。
-   *
-   * ============================ 占位实现，待接入 ============================
-   * TODO(A 的接口就绪后)：改成
-   *     const progressList: TaskProgressData[] = await A的数据层.queryTaskProgress(taskIdList);
-   *     再按 taskId 取值，本方法与 MOCK_PROGRESS_LIST 一并删除。
-   * 注意：这里只是页面内的假数据，没有读写数据库，也不影响真实积分。
-   * ======================================================================
-   */
-  private queryProgress(taskId: string): TaskProgressData {
-    const mock: MockProgressItem | undefined =
-      MOCK_PROGRESS_LIST.find((item: MockProgressItem) => item.taskId === taskId);
-    if (mock === undefined) {
-      return { current: 0, target: 1 };
-    }
-    return { current: mock.current, target: mock.target };
   }
 
   /** 根据进度判定状态 */
@@ -249,21 +208,19 @@ struct TaskList {
    *   4) 失败处理：接口返回失败时提示并保留「领取积分」按钮，允许重试。
    * ------------------------------------------------------------------
    */
-  private onClaim(task: TaskCardItem): void {
+  private async onClaim(task: TaskCardItem): Promise<void> {
     if (task.status !== STATUS_DONE || this.isClaimed(task.taskId)) {
       return;
     }
-
-    // ===== 占位：以下三行接入后应替换为 await 调用 A 的接口 =====
-    // const submitOk: boolean = await A的数据层.claimTaskReward(task.taskId, task.rewardPoint);
-    // if (!submitOk) { this.toast('领取失败，请重试'); return; }
-    // AppState.addPoint(task.rewardPoint);
-
-    // 占位阶段只更新页面状态，保证按钮与统计能即时反馈
+    const ok: boolean = await TaskService.claimReward(task.taskId, task.taskName, task.rewardPoint);
+    if (!ok) {
+      this.toast('领取失败，可能已经领取过');
+      await this.loadTasks();
+      return;
+    }
+    AppState.addPoint(task.rewardPoint);
     this.claimedTaskIds = this.claimedTaskIds.concat(task.taskId);
     this.toast('已领取 ' + task.rewardPoint + ' 积分');
-    hilog.info(LOG_DOMAIN, LOG_TAG, 'claim(taskId=%{public}s, point=%{public}d) placeholder',
-      task.taskId, task.rewardPoint);
   }
 
   /** 是否已领取（页面级判断，刷新后以 A 的领奖记录为准） */
