@@ -78,18 +78,6 @@ struct Index {
     }
   }
 
-<<<<<<< HEAD
-  /** 打开历史记录 */
-  private openHistory(): void {
-    try {
-      this.getUIContext().getRouter().pushUrl({ url: 'pages/History' }).catch((err: BusinessError) => {
-        this.toast('打开历史记录失败：' + err.message);
-      });
-    } catch (err) {
-      this.toast('打开历史记录失败');
-    }
-  }
-=======
   /** 打开数据看板 */
   private openDashboard(): void {
     try {
@@ -101,7 +89,16 @@ struct Index {
     }
   }
 
->>>>>>> main
+  /** 打开历史记录 */
+  private openHistory(): void {
+    try {
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/History' }).catch((err: BusinessError) => {
+        this.toast('打开历史记录失败：' + err.message);
+      });
+    } catch (err) {
+      this.toast('打开历史记录失败');
+    }
+  }
   /** 删除前先确认，避免误触 */
   private confirmDelete(item: CarbonRecord): void {
     try {
@@ -185,15 +182,6 @@ struct Index {
         .onClick(() => {
           this.openAdd();
         })
-      Button('历史记录 →')
-        .width('100%')
-        .height(44)
-        .margin({ top: 10 })
-        .backgroundColor('#E8F5E9')
-        .fontColor('#2E7D32')
-        .onClick(() => {
-          this.openHistory();
-        })
 
       Button('数据看板 →')
         .width('100%')
@@ -203,6 +191,15 @@ struct Index {
         .fontColor('#2E7D32')
         .onClick(() => {
           this.openDashboard();
+        })
+      Button('历史记录 →')
+        .width('100%')
+        .height(44)
+        .margin({ top: 10 })
+        .backgroundColor('#E8F5E9')
+        .fontColor('#2E7D32')
+        .onClick(() => {
+          this.openHistory();
         })
 
       Row() {
