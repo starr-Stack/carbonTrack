@@ -78,6 +78,17 @@ struct Index {
     }
   }
 
+  /** 打开数据看板 */
+  private openDashboard(): void {
+    try {
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/Dashboard' }).catch((err: BusinessError) => {
+        this.toast('打开看板失败：' + err.message);
+      });
+    } catch (err) {
+      this.toast('打开看板失败');
+    }
+  }
+
   /** 删除前先确认，避免误触 */
   private confirmDelete(item: CarbonRecord): void {
     try {
@@ -160,6 +171,16 @@ struct Index {
         .backgroundColor('#2E7D32')
         .onClick(() => {
           this.openAdd();
+        })
+
+      Button('数据看板 →')
+        .width('100%')
+        .height(44)
+        .margin({ top: 10 })
+        .backgroundColor('#E8F5E9')
+        .fontColor('#2E7D32')
+        .onClick(() => {
+          this.openDashboard();
         })
 
       Row() {
