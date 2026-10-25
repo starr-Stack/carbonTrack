@@ -2,6 +2,11 @@
   "src": [
     "pages/Index",
     "pages/AddRecord",
-    "pages/History"
+    "pages/Dashboard",
+    "pages/History",
+    "pages/TaskList",
+    "pages/BadgeList",
+    "pages/ArticleList",
+    "pages/ArticleDetail"
   ]
 }
