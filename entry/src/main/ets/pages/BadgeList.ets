@@ -19,6 +19,8 @@ import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { BadgeInitItem, BadgeUnlockState, TaskClaimState, BadgeUnlockUtil } from '../utils/BadgeUnlockUtil';
+import { TaskService } from '../service/TaskService';
+import { BadgeService, BadgeUnlockInput } from '../service/BadgeService';
 
 const LOG_DOMAIN: number = 0x3200;
 const LOG_TAG: string = 'BadgeList';
@@ -79,20 +81,6 @@ const EMPTY_BADGE: BadgeView = {
   unlockTime: ''
 };
 
-/**
- * 【占位数据】任务领奖状态列表。
- * 作用：A 的任务领奖记录接口就绪前，让页面能同时展示“已解锁 / 未解锁”两种样式。
- * 删除时机：mockTaskClaimStates() 改为从 A 的接口取数后，本常量整块删除。
- * 取值说明（与 TaskList 页的演示进度对应）：
- *   T001 已领奖 -> B001 解锁；T002 进行中未领奖 -> B002 未解锁；
- *   T003 未开始 -> B003 未解锁；T004 已领奖 -> B004 解锁。
- */
-const MOCK_TASK_CLAIM_STATES: TaskClaimState[] = [
-  { taskId: 'T001', claimed: true },
-  { taskId: 'T002', claimed: false },
-  { taskId: 'T003', claimed: false },
-  { taskId: 'T004', claimed: true }
-];
 
 @Entry
 @Component
@@ -117,7 +105,7 @@ struct BadgeList {
   /* ============================ 数据加载 ============================ */
 
   /** 读取两个 rawfile 配置 -> 判定解锁 -> 组装卡片 */
-  private loadData(): void {
+  private async loadData(): Promise<void> {
     this.loadState = 0;
     this.errorMsg = '';
     try {
@@ -134,7 +122,9 @@ struct BadgeList {
 
       // 任务名只是展示用，读不到不影响解锁判定
       const taskNames: Map<string, string> = this.loadTaskNames(context);
-      const states: TaskClaimState[] = this.mockTaskClaimStates();
+            // 已解锁徽章从数据库取，避免刷新后重复点亮
+      this.persistedBadgeIds = await BadgeService.getUnlockedBadgeIds();
+      const states: TaskClaimState[] = await this.loadClaimStates();
       const unlocks: BadgeUnlockState[] = BadgeUnlockUtil.evaluateAll(badges, states);
 
       const views: BadgeView[] = [];
@@ -163,7 +153,7 @@ struct BadgeList {
 
       this.badges = views;
       this.loadState = 1;
-      this.persistNewlyUnlocked(views);
+      await this.persistNewlyUnlocked(views);
       hilog.info(LOG_DOMAIN, LOG_TAG, 'badges loaded, count=%{public}d, unlocked=%{public}d',
         views.length, this.unlockedCount());
     } catch (err) {
@@ -211,21 +201,15 @@ struct BadgeList {
     return nameMap;
   }
 
-  /**
-   * 读取任务领奖状态列表。
-   *
-   * ======================== 占位实现，待接入 ========================
-   * TODO(A 的接口就绪后)：
-   *   1) 调 A 提供的任务领奖查询接口，拿到「已领奖任务 id 列表」；
-   *   2) 再映射成 TaskClaimState[]，交给 BadgeUnlockUtil 判定；
-   *   3) 本方法与 MOCK_TASK_CLAIM_STATES 一并删除。
-   * 注意：这里没有读写数据库，也不影响真实积分。
-   * ================================================================
-   */
-  private mockTaskClaimStates(): TaskClaimState[] {
-    return MOCK_TASK_CLAIM_STATES;
+  /** 从任务服务读取已领奖任务，组装成徽章判定需要的状态列表 */
+  private async loadClaimStates(): Promise<TaskClaimState[]> {
+    const claimedIds: string[] = await TaskService.getClaimedTaskIds();
+    const states: TaskClaimState[] = [];
+    for (const taskId of claimedIds) {
+      states.push({ taskId: taskId, claimed: true });
+    }
+    return states;
   }
-
   /**
    * 记录本次新解锁的徽章。
    *
@@ -238,20 +222,23 @@ struct BadgeList {
    *   if (!saved) { 记录日志并保留按钮，允许下次重试 }
    * ==========================================================
    */
-  private persistNewlyUnlocked(list: BadgeView[]): void {
-    const newlyUnlocked: string[] = [];
+  private async persistNewlyUnlocked(list: BadgeView[]): Promise<void> {
+    const inputs: BadgeUnlockInput[] = [];
     for (const item of list) {
       if (item.unlocked && this.persistedBadgeIds.indexOf(item.badgeId) < 0) {
-        newlyUnlocked.push(item.badgeId);
+        inputs.push({ badgeId: item.badgeId, badgeName: item.badgeName });
       }
     }
-    if (newlyUnlocked.length === 0) {
+    if (inputs.length === 0) {
       return;
     }
-    // ===== 占位：此处应 await 调用 A 的徽章解锁记录接口 =====
-    this.persistedBadgeIds = this.persistedBadgeIds.concat(newlyUnlocked);
-    hilog.info(LOG_DOMAIN, LOG_TAG, 'newly unlocked %{public}d badges (persist placeholder)',
-      newlyUnlocked.length);
+    const saved: boolean = await BadgeService.saveUnlocked(inputs);
+    if (saved) {
+      for (const item of inputs) {
+        this.persistedBadgeIds = this.persistedBadgeIds.concat(item.badgeId);
+      }
+      hilog.info(LOG_DOMAIN, LOG_TAG, 'persisted %{public}d badges', inputs.length);
+    }
   }
 
   /* ============================ 交互 ============================ */
