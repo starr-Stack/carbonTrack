@@ -263,20 +263,20 @@ struct ArticleDetail {
 
   /** 标签配色与列表页保持一致 */
   private tagColor(tag: string): string {
-    if (tag === '核算科普') {
+    if (tag === '核算方法') {
       return '#1565C0';
     }
-    if (tag === '政策与市场') {
+    if (tag === '机制说明') {
       return '#EF6C00';
     }
     return COLOR_PRIMARY;
   }
 
   private tagBg(tag: string): string {
-    if (tag === '核算科普') {
+    if (tag === '核算方法') {
       return '#E3F2FD';
     }
-    if (tag === '政策与市场') {
+    if (tag === '机制说明') {
       return '#FFF3E0';
     }
     return COLOR_PRIMARY_LIGHT;

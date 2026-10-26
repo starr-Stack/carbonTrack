@@ -143,190 +143,161 @@ struct TreeCertificate {
   /* ============================ UI ============================ */
 
   /** 证书主体：渐变描边 + 白色内页 */
+  /** 证书主体：奖状版式（双线边框 + 四角落款 + 印章） */
   @Builder
   CertificateBody() {
     Column() {
       Column() {
-        // 顶部英文小字，作为证书的版式装饰
-        Text('CARBON FOOTPRINT · TREE PLANTING')
-          .fontSize(10)
-          .fontColor(COLOR_MUTED)
-
-        Text('植树证书')
-          .fontSize(26)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(COLOR_PRIMARY_DEEP)
-          .margin({ top: 6 })
-
-        // 分隔线：短线 + 叶片 + 短线
-        Row() {
-          Text('')
-            .width(36)
-            .height(1)
-            .backgroundColor('#C8E6C9')
-          Text('🌿')
-            .fontSize(12)
-            .margin({ left: 8, right: 8 })
-          Text('')
-            .width(36)
-            .height(1)
-            .backgroundColor('#C8E6C9')
-        }
-        .alignItems(VerticalAlign.Center)
-        .margin({ top: 12 })
-
-        // 树形图标
+        // ---------- 内层细线框 ----------
         Column() {
-          Text('🌳')
-            .fontSize(46)
-        }
-        .width(88)
-        .height(88)
-        .justifyContent(FlexAlign.Center)
-        .backgroundColor(COLOR_PRIMARY_LIGHT)
-        .borderRadius(44)
-        .margin({ top: 16 })
+          Text('CARBON FOOTPRINT ASSESSMENT')
+            .fontSize(9)
+            .fontColor('#9E9D24')
+            .letterSpacing(2)
 
-        Text('兹证明')
-          .fontSize(13)
-          .fontColor(COLOR_TEXT)
-          .margin({ top: 18 })
-
-        Text('碳足迹用户')
-          .fontSize(18)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(COLOR_TITLE)
-          .margin({ top: 6 })
-
-        Text('在本应用累计减排')
-          .fontSize(13)
-          .fontColor(COLOR_TEXT)
-          .margin({ top: 14 })
-
-        Row() {
-          Text(this.totalCo2.toFixed(2))
-            .fontSize(34)
+          Text('植 树 证 书')
+            .fontSize(25)
             .fontWeight(FontWeight.Bold)
-            .fontColor(COLOR_PRIMARY)
-          Text(' kg CO₂e')
+            .fontColor(COLOR_PRIMARY_DEEP)
+            .letterSpacing(2)
+            .margin({ top: 8 })
+
+          Text('TREE PLANTING CERTIFICATE')
+            .fontSize(8)
+            .fontColor('#A1887F')
+            .letterSpacing(1.5)
+            .margin({ top: 4 })
+
+          Row() {
+            Text('')
+              .width(52)
+              .height(1)
+              .backgroundColor('#C5E1A5')
+            Text('')
+              .width(6)
+              .height(6)
+              .backgroundColor('#C5E1A5')
+              .margin({ left: 6, right: 6 })
+            Text('')
+              .width(52)
+              .height(1)
+              .backgroundColor('#C5E1A5')
+          }
+          .alignItems(VerticalAlign.Center)
+          .margin({ top: 12 })
+
+          // 证书插画：一棵树
+          Image($r('app.media.ic_cert_tree'))
+            .width(96)
+            .height(96)
+            .objectFit(ImageFit.Contain)
+            .margin({ top: 10 })
+
+          Text('兹 证 明')
             .fontSize(12)
-            .fontColor(COLOR_MUTED)
-            .margin({ left: 4, bottom: 6 })
-        }
-        .alignItems(VerticalAlign.Bottom)
-        .margin({ top: 4 })
+            .fontColor('#6D4C41')
+            .letterSpacing(1)
+            .margin({ top: 12 })
 
-        Text('约等于种下 ' + this.treeCount().toFixed(2) + ' 棵树的年固碳量')
-          .fontSize(12)
-          .fontColor(COLOR_TEXT)
-          .margin({ top: 8 })
+          Text('碳 足 迹 用 户')
+            .fontSize(17)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(COLOR_TITLE)
+            .letterSpacing(1)
+            .margin({ top: 8 })
 
-        Divider()
-          .color(COLOR_LINE)
-          .margin({ top: 18, bottom: 12 })
+          Text('截至 ' + this.todayText() + '，在本应用累计实现减排')
+            .fontSize(11)
+            .fontColor(COLOR_TEXT)
+            .margin({ top: 12 })
 
-        // 底部三列摘要
-        Row() {
-          Column() {
-            Text('累计减排')
-              .fontSize(11)
-              .fontColor(COLOR_MUTED)
+          Row() {
             Text(this.totalCo2.toFixed(2))
-              .fontSize(16)
+              .fontSize(30)
               .fontWeight(FontWeight.Bold)
               .fontColor(COLOR_PRIMARY)
-              .margin({ top: 2 })
-            Text('kg')
-              .fontSize(10)
-              .fontColor(COLOR_HINT)
-          }
-          .layoutWeight(1)
-
-          Column() {
-            Text('折合棵数')
+            Text('kg CO₂e')
               .fontSize(11)
               .fontColor(COLOR_MUTED)
-            Text(this.treeCount().toFixed(2))
-              .fontSize(16)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(COLOR_GOLD)
-              .margin({ top: 2 })
-            Text('棵')
-              .fontSize(10)
-              .fontColor(COLOR_HINT)
+              .margin({ left: 4, bottom: 4 })
           }
-          .layoutWeight(1)
+          .alignItems(VerticalAlign.Bottom)
+          .margin({ top: 2 })
 
-          Column() {
-            Text('发证日期')
-              .fontSize(11)
-              .fontColor(COLOR_MUTED)
-            Text(this.todayText().substring(5))
-              .fontSize(16)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(COLOR_TITLE)
-              .margin({ top: 2 })
-            Text(String(new Date().getFullYear()))
-              .fontSize(10)
-              .fontColor(COLOR_HINT)
+          Text('折 合 植 树 ' + this.treeCount().toFixed(2) + ' 棵')
+            .fontSize(14)
+            .fontColor(COLOR_PRIMARY_DEEP)
+            .letterSpacing(1)
+            .margin({ top: 10 })
+
+          Text('特发此证，以资鼓励')
+            .fontSize(11)
+            .fontColor(COLOR_TEXT)
+            .margin({ top: 8 })
+
+          // ---------- 落款区 ----------
+          Row() {
+            Column() {
+              Text('发证单位')
+                .fontSize(9)
+                .fontColor(COLOR_HINT)
+              Text('碳足迹 · 低碳生活实践平台')
+                .fontSize(10)
+                .fontColor(COLOR_TEXT)
+                .margin({ top: 3 })
+              Text('证书编号 ' + this.certNo())
+                .fontSize(9)
+                .fontColor(COLOR_HINT)
+                .margin({ top: 3 })
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+
+            // 印章：红色双环 + 竖排文字
+            Column() {
+              Text('碳足迹')
+                .fontSize(8)
+                .fontColor(COLOR_SEAL)
+              Text('低 碳 先 锋')
+                .fontSize(8)
+                .fontColor(COLOR_SEAL)
+                .margin({ top: 2 })
+              Text(this.todayText().substring(0, 7))
+                .fontSize(6)
+                .fontColor(COLOR_SEAL)
+                .margin({ top: 2 })
+            }
+            .width(64)
+            .height(64)
+            .justifyContent(FlexAlign.Center)
+            .border({ width: 2, color: COLOR_SEAL })
+            .borderRadius(32)
+            .rotate({ angle: -10 })
+            .opacity(0.9)
           }
-          .layoutWeight(1)
+          .width('100%')
+          .alignItems(VerticalAlign.Bottom)
+          .margin({ top: 16 })
         }
         .width('100%')
-        .alignItems(VerticalAlign.Top)
-
-        // 编号与印章
-        Row() {
-          Column() {
-            Text('证书编号')
-              .fontSize(10)
-              .fontColor(COLOR_HINT)
-            Text(this.certNo())
-              .fontSize(11)
-              .fontColor(COLOR_TEXT)
-              .margin({ top: 2 })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-
-          // 印章：红色圆环 + 两行字，整体轻微旋转，模拟盖章效果
-          Column() {
-            Text('碳足迹')
-              .fontSize(9)
-              .fontColor(COLOR_SEAL)
-            Text('低碳先锋')
-              .fontSize(9)
-              .fontColor(COLOR_SEAL)
-              .margin({ top: 1 })
-          }
-          .width(58)
-          .height(58)
-          .justifyContent(FlexAlign.Center)
-          .border({ width: 2, color: COLOR_SEAL })
-          .borderRadius(29)
-          .rotate({ angle: -12 })
-          .opacity(0.85)
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Bottom)
-        .margin({ top: 18 })
+        .padding({ left: 14, right: 14, top: 16, bottom: 14 })
+        .border({ width: 1, color: '#C5E1A5' })
+        .borderRadius(4)
+        .alignItems(HorizontalAlign.Center)
       }
       .width('100%')
-      .padding({ left: 20, right: 20, top: 22, bottom: 18 })
-      .backgroundColor(COLOR_CARD)
-      .borderRadius(18)
-      .alignItems(HorizontalAlign.Center)
+      .padding(5)
+      .border({ width: 2, color: COLOR_PRIMARY })
+      .borderRadius(8)
+      .backgroundColor('#FDFDF5')
     }
     .width('100%')
     .padding(3)
-    .linearGradient({
-      angle: 135,
-      colors: [['#2E7D32', 0.0], ['#A5D6A7', 1.0]]
-    })
-    .borderRadius(21)
+    .backgroundColor('#FFFFFF')
+    .borderRadius(12)
   }
 
-  /** 未达发证线时的提示卡 */
+
   @Builder
   NotYetBody() {
     Column() {
