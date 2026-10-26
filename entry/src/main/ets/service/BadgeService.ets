@@ -4,9 +4,9 @@
  *
  * 设计说明：
  *   1. 解锁判定仍由 utils/BadgeUnlockUtil 完成（纯函数），本服务只负责存取；
- *   2. getUnlockedBadgeIds() 供页面回显已点亮徽章；
- *   3. saveUnlocked() 在事务里批量写入，按 badgeId 去重，重复调用不会产生重复记录；
- *   4. 徽章名称一起落库，方便后续做「我的徽章」页面或导出。
+ *   2. getUnlockedBadges() 返回 badgeId / badgeName / unlockedAt，供徽章详情展示解锁时间；
+ *   3. getUnlockTime() 查询单枚徽章的解锁时间，未解锁返回 -1；
+ *   4. saveUnlocked() 在事务里批量写入，按 badgeId 去重，重复调用不会产生重复记录。
  */
 
 import { relationalStore as rdb } from '@kit.ArkData';
@@ -23,23 +23,64 @@ export interface BadgeUnlockInput {
   badgeName: string;
 }
 
+/** 已解锁徽章（含解锁时间） */
+export interface UnlockedBadge {
+  badgeId: string;
+  badgeName: string;
+  /** 解锁时间戳（毫秒），0 表示异常数据 */
+  unlockedAt: number;
+}
+
 export class BadgeService {
-  /** 查询已解锁的徽章 id 列表 */
-  public static async getUnlockedBadgeIds(): Promise<string[]> {
-    const ids: string[] = [];
+  /** 查询已解锁徽章（含名称与解锁时间），按解锁时间倒序 */
+  public static async getUnlockedBadges(): Promise<UnlockedBadge[]> {
+    const list: UnlockedBadge[] = [];
     if (!DBUtil.isReady()) {
-      return ids;
+      return list;
     }
     const predicates: rdb.RdbPredicates = new rdb.RdbPredicates(TABLE.badge);
     predicates.greaterThan('unlockedAt', 0);
     const rows: Array<rdb.ValuesBucket> = await DBUtil.query(TABLE.badge, predicates);
     for (const row of rows) {
       const badgeId: rdb.ValueType = row['badgeId'];
-      if (typeof badgeId === 'string' && badgeId.length > 0) {
-        ids.push(badgeId);
+      if (typeof badgeId !== 'string' || badgeId.length === 0) {
+        continue;
       }
+      const badgeName: rdb.ValueType = row['badgeName'];
+      const unlockedAt: rdb.ValueType = row['unlockedAt'];
+      list.push({
+        badgeId: badgeId,
+        badgeName: typeof badgeName === 'string' ? badgeName : '',
+        unlockedAt: typeof unlockedAt === 'number' ? unlockedAt : 0
+      });
+    }
+    list.sort((a: UnlockedBadge, b: UnlockedBadge) => b.unlockedAt - a.unlockedAt);
+    return list;
+  }
+
+  /** 查询已解锁的徽章 id 列表（兼容旧调用） */
+  public static async getUnlockedBadgeIds(): Promise<string[]> {
+    const badges: UnlockedBadge[] = await BadgeService.getUnlockedBadges();
+    const ids: string[] = [];
+    for (const item of badges) {
+      ids.push(item.badgeId);
     }
     return ids;
+  }
+
+  /** 查询单枚徽章的解锁时间，未解锁返回 -1 */
+  public static async getUnlockTime(badgeId: string): Promise<number> {
+    if (!DBUtil.isReady() || badgeId.length === 0) {
+      return -1;
+    }
+    const predicates: rdb.RdbPredicates = new rdb.RdbPredicates(TABLE.badge);
+    predicates.equalTo('badgeId', badgeId);
+    const rows: Array<rdb.ValuesBucket> = await DBUtil.query(TABLE.badge, predicates);
+    if (rows.length === 0) {
+      return -1;
+    }
+    const value: rdb.ValueType = rows[0]['unlockedAt'];
+    return typeof value === 'number' && value > 0 ? value : -1;
   }
 
   /**
