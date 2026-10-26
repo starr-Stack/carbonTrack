@@ -16,7 +16,7 @@ import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { AppState } from '../model/AppState';
-import { TaskService, TaskProgress } from '../service/TaskService';
+import { TaskService, TaskProgress, ClaimResult } from '../service/TaskService';
 
 const LOG_DOMAIN: number = 0x3200;
 const LOG_TAG: string = 'TaskList';
@@ -209,13 +209,17 @@ struct TaskList {
     if (task.status !== STATUS_DONE || this.isClaimed(task.taskId)) {
       return;
     }
-    const ok: boolean = await TaskService.claimReward(task.taskId, task.taskName, task.rewardPoint);
-    if (!ok) {
-      this.toast('领取失败，可能已经领取过');
+    const result: ClaimResult = await TaskService.claimReward(task.taskId, task.taskName, task.rewardPoint);
+    if (result.alreadyClaimed) {
+      this.toast('该任务已经领取过');
       await this.loadTasks();
       return;
     }
-    AppState.addPoint(task.rewardPoint);
+    if (!result.success) {
+      this.toast(result.capped ? '今日积分已达上限，明天再来领取' : '领取失败，请重试');
+      return;
+    }
+    AppState.addPoint(result.awarded);
     this.claimedTaskIds = this.claimedTaskIds.concat(task.taskId);
     this.toast('已领取 ' + task.rewardPoint + ' 积分');
   }
