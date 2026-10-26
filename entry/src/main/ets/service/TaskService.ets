@@ -9,20 +9,25 @@
  *        record -> 总记录条数
  *        co2    -> 累计减排量
  *        其他   -> 对应 categoryId 的记录条数
- *   3. 领奖在一个事务里完成：写 task_list 领奖记录 + 加 user_info 累计积分
+ *   3. 领奖在一个事务里完成：额度校验 + 写 task_list 领奖记录 + 加 user_info 累计积分
  *      + 更新当天 daily_point_summary，任何一步失败整体回滚；
- *   4. 幂等：同一个 taskId 已领过奖时直接返回 false，不会重复发积分。
+ *   4. 每日积分上限与记录页共用同一规则（CarbonCalculator 的 dailyCap）：
+ *      今天已得积分 + 本次奖励 > 上限时，本次领取失败，任务保持可领取，次日再来；
+ *   5. 幂等：同一个 taskId 已领过奖时直接返回 alreadyClaimed，不会重复发积分。
  */
 
 import { relationalStore as rdb } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { TABLE } from '../model/TableType';
 import { DBUtil } from '../common/DBUtil';
+import { CarbonCalculator } from '../utils/CarbonCalculator';
 
 const LOG_DOMAIN: number = 0x3200;
 const LOG_TAG: string = 'TaskService';
 /** user_info 固定单行 */
 const USER_ROW_ID: number = 1;
+/** 因子库没加载出来时的兜底上限，与 factors.json 的 dailyCap 保持一致 */
+const FALLBACK_DAILY_CAP: number = 500;
 
 /** 任务进度 */
 export interface TaskProgress {
@@ -30,6 +35,18 @@ export interface TaskProgress {
   current: number;
   /** 目标值 */
   target: number;
+}
+
+/** 领奖结果 */
+export interface ClaimResult {
+  /** 是否成功发放积分 */
+  success: boolean;
+  /** 实际发放的积分，失败为 0 */
+  awarded: number;
+  /** 今日积分额度不足，本次未发放 */
+  capped: boolean;
+  /** 该任务之前已经领过 */
+  alreadyClaimed: boolean;
 }
 
 export class TaskService {
@@ -86,19 +103,35 @@ export class TaskService {
 
   /**
    * 领取任务奖励
-   * @returns true 领取成功；false 已领过 / 数据库未就绪 / 写入失败
+   * @returns 领取结果；失败时 awarded 为 0
    */
   public static async claimReward(taskId: string, taskName: string,
-    rewardPoint: number): Promise<boolean> {
+    rewardPoint: number): Promise<ClaimResult> {
+    const failed: ClaimResult = {
+      success: false,
+      awarded: 0,
+      capped: false,
+      alreadyClaimed: false
+    };
     if (!DBUtil.isReady() || taskId.length === 0 || rewardPoint <= 0) {
       hilog.warn(LOG_DOMAIN, LOG_TAG, 'claim skipped: invalid args');
-      return false;
+      return failed;
     }
 
     let alreadyClaimed: boolean = false;
+    let capped: boolean = false;
     const committed: boolean = await DBUtil.runInTransaction(async (store: rdb.RdbStore) => {
       alreadyClaimed = await TaskService.hasClaimed(store, taskId);
       if (alreadyClaimed) {
+        return;
+      }
+
+      const earnedToday: number = await TaskService.readTodayPoint(store);
+      const cap: number = TaskService.dailyCap();
+      if (earnedToday + rewardPoint > cap) {
+        capped = true;
+        hilog.info(LOG_DOMAIN, LOG_TAG, 'daily cap reached: %{public}d + %{public}d > %{public}d',
+          earnedToday, rewardPoint, cap);
         return;
       }
 
@@ -114,16 +147,31 @@ export class TaskService {
       await TaskService.addDailyPoint(store, rewardPoint);
     });
 
+    const success: boolean = committed && !alreadyClaimed && !capped;
     if (!committed) {
       hilog.error(LOG_DOMAIN, LOG_TAG, 'claim transaction failed: %{public}s', taskId);
-      return false;
+    } else if (success) {
+      hilog.info(LOG_DOMAIN, LOG_TAG, 'claimed: %{public}s +%{public}d', taskId, rewardPoint);
     }
-    if (alreadyClaimed) {
-      hilog.info(LOG_DOMAIN, LOG_TAG, 'already claimed: %{public}s', taskId);
-      return false;
+    return {
+      success: success,
+      awarded: success ? rewardPoint : 0,
+      capped: capped,
+      alreadyClaimed: alreadyClaimed
+    };
+  }
+
+  /** 每日积分上限：优先取因子库规则，取不到用 500 兜底 */
+  private static dailyCap(): number {
+    try {
+      const rule = CarbonCalculator.getInstance().getPointsRule();
+      if (rule !== undefined && rule.dailyCap > 0) {
+        return rule.dailyCap;
+      }
+    } catch (err) {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'read daily cap failed, use fallback');
     }
-    hilog.info(LOG_DOMAIN, LOG_TAG, 'claimed: %{public}s +%{public}d', taskId, rewardPoint);
-    return true;
+    return FALLBACK_DAILY_CAP;
   }
 
   /** 是否已领奖 */
@@ -161,7 +209,7 @@ export class TaskService {
     }
   }
 
-  /** 累计积分 +reward */
+  /** 累计积分 +point */
   private static async addUserPoint(store: rdb.RdbStore, point: number): Promise<void> {
     try {
       await store.executeSql('UPDATE ' + TABLE.user_info +
@@ -172,7 +220,7 @@ export class TaskService {
     }
   }
 
-  /** 当天汇总积分 +reward；没有当天汇总行时新建 */
+  /** 当天汇总积分 +point；没有当天汇总行时新建 */
   private static async addDailyPoint(store: rdb.RdbStore, point: number): Promise<void> {
     try {
       const day: string = TaskService.todayKey();
@@ -221,6 +269,33 @@ export class TaskService {
       }
     } catch (err) {
       hilog.error(LOG_DOMAIN, LOG_TAG, 'addDailyPoint failed: %{public}s', TaskService.describe(err));
+      throw err as Error;
+    }
+  }
+
+  /** 读取今天的汇总积分，用于额度校验 */
+  private static async readTodayPoint(store: rdb.RdbStore): Promise<number> {
+    try {
+      const predicates: rdb.RdbPredicates = new rdb.RdbPredicates(TABLE.daily_point_summary);
+      predicates.equalTo('summaryDate', TaskService.todayKey());
+      let rs: rdb.ResultSet | undefined = undefined;
+      try {
+        rs = await store.query(predicates, ['totalPoint']);
+        if (rs.goToFirstRow()) {
+          return TaskService.asNumber(rs.getRow()['totalPoint']);
+        }
+        return 0;
+      } finally {
+        if (rs !== undefined) {
+          try {
+            rs.close();
+          } catch (err) {
+            hilog.warn(LOG_DOMAIN, LOG_TAG, 'close today point result set failed');
+          }
+        }
+      }
+    } catch (err) {
+      hilog.error(LOG_DOMAIN, LOG_TAG, 'readTodayPoint failed: %{public}s', TaskService.describe(err));
       throw err as Error;
     }
   }
