@@ -20,7 +20,7 @@ import { util } from '@kit.ArkTS';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { BadgeInitItem, BadgeUnlockState, TaskClaimState, BadgeUnlockUtil } from '../utils/BadgeUnlockUtil';
 import { TaskService } from '../service/TaskService';
-import { BadgeService, BadgeUnlockInput } from '../service/BadgeService';
+import { BadgeService, BadgeUnlockInput, UnlockedBadge } from '../service/BadgeService';
 
 const LOG_DOMAIN: number = 0x3200;
 const LOG_TAG: string = 'BadgeList';
@@ -63,7 +63,7 @@ interface BadgeView {
   bindTaskNames: string[];
   /** 仍未领奖的任务名，未解锁时提示“还差哪几个” */
   pendingTaskNames: string[];
-  /** 解锁时间文案：数据库目前只返回已解锁的 badgeId，暂取不到时间戳，先留空显示为「—」 */
+  /** 解锁时间文案（yyyy-MM-dd HH:mm），未解锁为空串 */
   unlockTime: string;
 }
 
@@ -122,8 +122,14 @@ struct BadgeList {
 
       // 任务名只是展示用，读不到不影响解锁判定
       const taskNames: Map<string, string> = this.loadTaskNames(context);
-            // 已解锁徽章从数据库取，避免刷新后重复点亮
+      // 已解锁徽章从数据库取，避免刷新后重复点亮
       this.persistedBadgeIds = await BadgeService.getUnlockedBadgeIds();
+      // 解锁时间同样来自数据库（毫秒时间戳），用于详情里展示
+      const unlockedList: UnlockedBadge[] = await BadgeService.getUnlockedBadges();
+      const unlockTimeMap: Map<string, number> = new Map<string, number>();
+      for (const item of unlockedList) {
+        unlockTimeMap.set(item.badgeId, item.unlockedAt);
+      }
       const states: TaskClaimState[] = await this.loadClaimStates();
       const unlocks: BadgeUnlockState[] = BadgeUnlockUtil.evaluateAll(badges, states);
 
@@ -147,7 +153,7 @@ struct BadgeList {
           requiredCount: unlock.requiredCount,
           bindTaskNames: this.mapTaskNames(bindIds, taskNames),
           pendingTaskNames: this.mapTaskNames(unlock.pendingTaskIds, taskNames),
-          unlockTime: ''
+          unlockTime: this.formatTime(unlockTimeMap.get(badgeId) ?? 0)
         });
       }
 
@@ -284,6 +290,19 @@ struct BadgeList {
   }
 
   /* ============================ 工具方法 ============================ */
+
+  /** 毫秒时间戳 -> yyyy-MM-dd HH:mm；非正数返回空串（详情里显示为「—」） */
+  private formatTime(timestamp: number): string {
+    if (!Number.isFinite(timestamp) || timestamp <= 0) {
+      return '';
+    }
+    const d: Date = new Date(timestamp);
+    const month: string = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day: string = d.getDate().toString().padStart(2, '0');
+    const hour: string = d.getHours().toString().padStart(2, '0');
+    const minute: string = d.getMinutes().toString().padStart(2, '0');
+    return d.getFullYear() + '-' + month + '-' + day + ' ' + hour + ':' + minute;
+  }
 
   /** 已解锁数量 */
   private unlockedCount(): number {
