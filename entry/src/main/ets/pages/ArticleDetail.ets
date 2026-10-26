@@ -48,6 +48,7 @@ const BLOCK_BULLET: number = 4;
 const BLOCK_QUOTE: number = 5;
 const BLOCK_TABLE: number = 6;
 const BLOCK_DIVIDER: number = 7;
+const BLOCK_IMAGE: number = 8;
 
 /** article_list.json 的解析类型（配置 DTO，非数据库实体） */
 interface ArticleItem {
@@ -181,6 +182,10 @@ struct ArticleDetail {
       if (line.length === 0) {
         continue;
       }
+      if (line.startsWith('@img:')) {
+        blocks.push(this.makeBlock(BLOCK_IMAGE, line.substring(5).trim(), '', ''));
+        continue;
+      }
       if (line === '---') {
         blocks.push(this.makeBlock(BLOCK_DIVIDER, '', '', ''));
         continue;
@@ -259,6 +264,29 @@ struct ArticleDetail {
     } catch (err) {
       // 页面栈为空时忽略
     }
+  }
+
+  /**
+   * 图片资源名 -> Resource。
+   * $r() 只接受编译期字面量，所以这里用分支映射；新增配图时补一条分支。
+   */
+  private imageResource(name: string): Resource {
+    if (name === 'ic_art_1') {
+      return $r('app.media.ic_art_1');
+    }
+    if (name === 'ic_art_2') {
+      return $r('app.media.ic_art_2');
+    }
+    if (name === 'ic_art_3') {
+      return $r('app.media.ic_art_3');
+    }
+    if (name === 'ic_art_4') {
+      return $r('app.media.ic_art_4');
+    }
+    if (name === 'ic_art_5') {
+      return $r('app.media.ic_art_5');
+    }
+    return $r('app.media.startIcon');
   }
 
   /** 标签配色与列表页保持一致 */
@@ -364,6 +392,13 @@ struct ArticleDetail {
       .alignItems(VerticalAlign.Top)
       .padding({ top: 10, bottom: 10 })
       .border({ width: { bottom: 1 }, color: '#F0F0F0' })
+    } else if (block.type === BLOCK_IMAGE) {
+      Image(this.imageResource(block.text))
+        .width('100%')
+        .constraintSize({ minHeight: 120, maxHeight: 280 })
+        .objectFit(ImageFit.Contain)
+        .borderRadius(10)
+        .margin({ top: 6, bottom: 14 })
     } else if (block.type === BLOCK_DIVIDER) {
       Divider()
         .color('#E8EAED')

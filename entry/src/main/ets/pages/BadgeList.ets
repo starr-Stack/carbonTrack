@@ -325,6 +325,21 @@ struct BadgeList {
    * 没匹配到时回退到项目已有的 startIcon，避免运行时取不到资源。
    */
   private iconResource(iconRes: string): Resource {
+    if (iconRes === 'ic_badge_lv1') {
+      return $r('app.media.ic_badge_lv1');
+    }
+    if (iconRes === 'ic_badge_lv2') {
+      return $r('app.media.ic_badge_lv2');
+    }
+    if (iconRes === 'ic_badge_lv3') {
+      return $r('app.media.ic_badge_lv3');
+    }
+    if (iconRes === 'ic_badge_lv4') {
+      return $r('app.media.ic_badge_lv4');
+    }
+    if (iconRes === 'ic_badge_lv5') {
+      return $r('app.media.ic_badge_lv5');
+    }
     if (iconRes === 'ic_badge_newbie') {
       return $r('app.media.ic_badge_newbie');
     }
