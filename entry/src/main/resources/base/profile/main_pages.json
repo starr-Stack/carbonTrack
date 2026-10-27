@@ -9,6 +9,7 @@
     "pages/ArticleList",
     "pages/ArticleDetail",
     "pages/DataManage",
-    "pages/TreeCertificate"
+    "pages/TreeCertificate",
+    "pages/Preview"
   ]
 }
