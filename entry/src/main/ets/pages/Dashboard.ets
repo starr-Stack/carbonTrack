@@ -6,10 +6,10 @@
  *   1. 顶部下拉框选择「日 / 周 / 月 / 年」，切换后重新组装 Entry 并刷新模型；
  *   2. 两张统计卡片：累计减排、累计积分；
  *   3. 折线图：X 轴为时间标签，Y 轴为减排量 kgCO₂e，绿色线条 + 数值标签；
- *   4. 分类占比、数据明细两块容器仍为占位，后续接饼图；
+ *   4. 分类占比为饼图，数据明细列出当前周期的逐项数据；
  *   5. 空数据时显示提示文字，不渲染图表；
- *   6. 数据目前来自页面内的模拟数组（getTrendData / getPieData），
- *      已标注 TODO，后续对接 Rdb 的 daily_point_summary / carbon_record。
+ *   6. 数据来自 service/StatisticsService（对 carbon_record 做 SUM/GROUP BY），
+ *      累计卡片取 user_info 的全量累计，与首页、证书页口径一致。
  *
  * 依赖：@ohos/mpchart（已通过 ohpm 安装到项目依赖）
  */
@@ -47,6 +47,12 @@ import {
   ChartColor
 } from '@ohos/mpchart';
 
+import { hilog } from '@kit.PerformanceAnalysisKit';
+import { StatisticsService, TrendItem, PieItem, TotalStat } from '../service/StatisticsService';
+
+const LOG_DOMAIN: number = 0x3200;
+const LOG_TAG: string = 'Dashboard';
+
 /* ==================== 低碳绿配色（页面与图表统一） ==================== */
 /** 主色：深绿 */
 const COLOR_PRIMARY: string = '#2E7D32';
@@ -64,81 +70,6 @@ const COLOR_TEXT_HINT: string = '#90A4AE';
 const COLOR_BG: string = '#F1F3F5';
 /** 图表内部用的绿色（ARGB 数值，与 COLOR_PRIMARY 同色） */
 const CHART_GREEN: number = 0xFF2E7D32;
-
-/** 趋势数据项：某个时间点的减排量与积分 */
-export interface TrendItem {
-  /** 时间标签，如 10-24、2026-W43、2026-10 */
-  label: string;
-  /** 减排量，单位 kgCO2e（折线图的 Y 值） */
-  value: number;
-  /** 获得的积分 */
-  point: number;
-}
-
-/** 饼图数据项：某个分类的占比 */
-export interface PieItem {
-  /** 分类名称，如 出行、节电 */
-  name: string;
-  /** 该分类的减排量，单位 kgCO2e */
-  value: number;
-  /** 占比，0-100 */
-  percent: number;
-}
-
-/**
- * 按周期准备的模拟数据
- * 注意：不同周期用不同的标签和形状，避免"整体等比放大"导致折线看起来没变化
- * TODO 后续对接 Rdb：
- *   查询 daily_point_summary，按 日/周/月/年 分桶后聚合
- */
-const trendDayMock: TrendItem[] = [
-  { label: '10-18', value: 0.86, point: 41 },
-  { label: '10-19', value: 1.24, point: 58 },
-  { label: '10-20', value: 0.72, point: 35 },
-  { label: '10-21', value: 1.68, point: 77 },
-  { label: '10-22', value: 1.05, point: 49 },
-  { label: '10-23', value: 1.92, point: 88 },
-  { label: '10-24', value: 1.36, point: 63 }
-];
-
-const trendWeekMock: TrendItem[] = [
-  { label: '第38周', value: 3.20, point: 128 },
-  { label: '第39周', value: 4.65, point: 186 },
-  { label: '第40周', value: 2.80, point: 112 },
-  { label: '第41周', value: 5.40, point: 216 },
-  { label: '第42周', value: 4.10, point: 164 },
-  { label: '第43周', value: 6.30, point: 252 }
-];
-
-const trendMonthMock: TrendItem[] = [
-  { label: '2026-05', value: 18.6, point: 372 },
-  { label: '2026-06', value: 22.4, point: 448 },
-  { label: '2026-07', value: 19.8, point: 396 },
-  { label: '2026-08', value: 25.2, point: 504 },
-  { label: '2026-09', value: 21.5, point: 430 },
-  { label: '2026-10', value: 27.3, point: 546 }
-];
-
-const trendYearMock: TrendItem[] = [
-  { label: '2022', value: 96.4, point: 385 },
-  { label: '2023', value: 118.2, point: 472 },
-  { label: '2024', value: 135.6, point: 542 },
-  { label: '2025', value: 152.8, point: 611 },
-  { label: '2026', value: 168.4, point: 673 }
-];
-
-/**
- * 模拟分类占比数据
- * TODO 后续对接 Rdb：
- *   按 categoryId 聚合 carbon_record 的 reduceCo2
- */
-const pieMockData: PieItem[] = [
-  { name: '出行', value: 6.82, percent: 39 },
-  { name: '节电', value: 4.15, percent: 24 },
-  { name: '节水', value: 2.36, percent: 13 },
-  { name: '旧物回收', value: 3.12, percent: 18 },
-  { name: '光盘行动', value: 1.05, percent: 6 }
-];
 
 @Entry
 @Component
@@ -347,34 +278,37 @@ struct Dashboard {
     this.pieModel.setExtraOffsets(8, 12, 8, 8);
   }
 
-  /** 刷新全部数据：趋势、占比、累计统计，然后重绘图表 */
+  /**
+   * 刷新全部数据：趋势、分类占比、累计统计。
+   * 趋势与占比由 StatisticsService 查库聚合；两张累计卡片取 user_info 的全量累计，
+   * 这样切换日/周/月时卡片不会跳变，也和首页、证书页的数字对得上。
+   */
   private async refresh(): Promise<void> {
     this.loading = true;
+    try {
+      const trend: TrendItem[] = await StatisticsService.queryTrend(this.rangeLabel);
+      const pie: PieItem[] = await StatisticsService.queryCategoryShare(this.rangeLabel);
+      const total: TotalStat = await StatisticsService.queryTotals();
 
-    const trend: TrendItem[] = await this.getTrendData(this.rangeLabel);
-    const pie: PieItem[] = await this.getPieData(this.rangeLabel);
+      this.trendData = trend;
+      this.pieData = pie;
+      this.totalCo2 = total.co2;
+      this.totalPoint = total.point;
 
-    this.trendData = trend;
-    this.pieData = pie;
-
-    let co2: number = 0;
-    let point: number = 0;
-    for (const item of trend) {
-      co2 += item.value;
-      point += item.point;
+      // 数据变了就重新组装 Entry、刷新模型
+      if (this.trendData.length > 0) {
+        this.rebuildLineData();
+        this.rebuildBarData();
+      }
+      if (this.pieData.length > 0) {
+        this.rebuildPieData();
+      }
+    } catch (err) {
+      this.trendData = [];
+      this.pieData = [];
+      hilog.error(LOG_DOMAIN, LOG_TAG, 'refresh failed: %{public}s',
+        err instanceof Error ? err.message : String(err));
     }
-    this.totalCo2 = Math.round(co2 * 100) / 100;
-    this.totalPoint = point;
-
-    // 数据变了就重新组装 Entry、刷新模型
-    if (this.trendData.length > 0) {
-      this.rebuildLineData();
-      this.rebuildBarData();
-    }
-    if (this.pieData.length > 0) {
-      this.rebuildPieData();
-    }
-
     this.loading = false;
   }
 
@@ -507,45 +441,6 @@ struct Dashboard {
   /** 分类 -> 颜色（十六进制字符串，给文字图例用） */
   private pieColorText(name: string): string {
     return '#' + this.pieColorOf(name).toString(16).slice(2).toUpperCase();
-  }
-
-  /**
-   * 获取趋势数据（占位实现）
-   * TODO 后续对接 Rdb：从 daily_point_summary 取出每日汇总，
-   *      再按 日/周/月/年 分桶求和
-   * @param range 时间范围：日、周、月、年
-   */
-  private async getTrendData(range: string): Promise<TrendItem[]> {
-    // 不同周期使用不同标签、不同形状的模拟数据
-    let source: TrendItem[] = trendDayMock;
-    if (range === '周') {
-      source = trendWeekMock;
-    } else if (range === '月') {
-      source = trendMonthMock;
-    } else if (range === '年') {
-      source = trendYearMock;
-    }
-
-    const result: TrendItem[] = [];
-    for (const item of source) {
-      result.push({ label: item.label, value: item.value, point: item.point });
-    }
-    return result;
-  }
-
-  /**
-   * 获取分类占比数据（占位实现）
-   * TODO 后续对接 Rdb：查询 carbon_record，按 categoryId 聚合 reduceCo2，
-   *      再计算每个分类的百分比
-   * @param range 时间范围：日、周、月、年
-   */
-  private async getPieData(range: string): Promise<PieItem[]> {
-    // 骨架阶段直接返回模拟数据；后续按 range 过滤日期范围
-    const result: PieItem[] = [];
-    for (const item of pieMockData) {
-      result.push({ name: item.name, value: item.value, percent: item.percent });
-    }
-    return result;
   }
 
   build() {
