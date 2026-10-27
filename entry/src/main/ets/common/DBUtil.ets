@@ -203,6 +203,37 @@ export class DBUtil {
   }
 
   /**
+   * 执行一条聚合查询（只读）。
+   * 统计需要在数据库端完成 SUM/GROUP BY，predicates 那套接口表达不了，
+   * 所以单独开一个通道；SQL 由调用方传入，本方法不校验语句，只负责执行与游标释放。
+   * @param sql      形如 SELECT ... GROUP BY ... 的查询语句
+   * @param bindArgs 占位符参数
+   */
+  public static async querySql(sql: string,
+    bindArgs?: Array<rdb.ValueType>): Promise<Array<rdb.ValuesBucket>> {
+    const rows: Array<rdb.ValuesBucket> = [];
+    const store: rdb.RdbStore | undefined = rdbStore;
+    if (store === undefined) {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'querySql skipped: database not ready');
+      return rows;
+    }
+    let rs: rdb.ResultSet | undefined = undefined;
+    try {
+      rs = await store.querySql(sql, bindArgs === undefined ? [] : bindArgs);
+      while (rs.goToNextRow()) {
+        rows.push(rs.getRow());
+      }
+      hilog.debug(LOG_DOMAIN, LOG_TAG, 'querySql ok, rows=%{public}d', rows.length);
+    } catch (err) {
+      hilog.error(LOG_DOMAIN, LOG_TAG, 'querySql failed: %{public}s', DBUtil.describe(err));
+    } finally {
+      DBUtil.closeQuietly(rs);
+    }
+    return rows;
+  }
+
+
+  /**
    * 执行任意 SQL（建表、迁移、批量语句），新增数据表时可复用
    * @param sql      要执行的 SQL
    * @param bindArgs 可选参数，使用 ? 占位符绑定，避免拼接 SQL
