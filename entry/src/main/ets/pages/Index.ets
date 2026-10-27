@@ -184,170 +184,370 @@ struct Index {
     await this.refresh();
   }
 
+  /** 纯原生形状绘制的叶片标识，不引入外部图片 */
+  @Builder
+  leafBadge(size: number) {
+    Stack({ alignContent: Alignment.Center }) {
+      Column()
+        .width(size)
+        .height(size)
+        .borderRadius(size / 2)
+        .backgroundColor('#EAF4E2')
+
+      Shape() {
+        Path()
+          .commands('M28 6 C15 13 11 31 28 49 C45 31 41 13 28 6 Z')
+          .fill('#7CB342')
+        Path()
+          .commands('M28 12 L28 45')
+          .stroke('#F6FBF2')
+          .strokeWidth(2)
+        Path()
+          .commands('M28 24 L21 18')
+          .stroke('#F6FBF2')
+          .strokeWidth(1.5)
+        Path()
+          .commands('M28 32 L35 26')
+          .stroke('#F6FBF2')
+          .strokeWidth(1.5)
+      }
+      .width(size * 0.58)
+      .height(size * 0.58)
+      .viewPort({ x: 0, y: 0, width: 56, height: 56 })
+    }
+    .width(size)
+    .height(size)
+  }
+
   build() {
-    Column() {
-      Column() {
-        Text('碳足迹').fontSize(28).fontWeight(FontWeight.Bold).fontColor('#1B5E20')
-        Text(todayText()).fontSize(13).fontColor('#78909C').margin({ top: 4 })
-      }
-      .alignItems(HorizontalAlign.Start)
-      .width('100%')
-
-      Row() {
-        Column() {
-          Text('今日减排').fontSize(13).fontColor('#607D8B')
-          Text('≈ ' + this.todayCo2.toFixed(2)).fontSize(30).fontWeight(FontWeight.Bold).fontColor('#2E7D32')
-          Text('kg CO₂e · 按实际值').fontSize(12).fontColor('#90A4AE')
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-
-        Column() {
-          Text('今日积分').fontSize(13).fontColor('#607D8B')
-          Text(String(this.todayPoint)).fontSize(30).fontWeight(FontWeight.Bold).fontColor('#F9A825')
-          Text('分').fontSize(12).fontColor('#90A4AE')
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-      }
-      .width('100%')
-      .padding(18)
-      .backgroundColor(Color.White)
-      .borderRadius(16)
-      .margin({ top: 16 })
-
-      Button('+ 记录低碳行为')
-        .width('100%')
-        .height(48)
-        .margin({ top: 16 })
-        .backgroundColor('#2E7D32')
-        .onClick(() => {
-          this.openAdd();
-        })
-
-      Button('数据看板 →')
-        .width('100%')
-        .height(44)
-        .margin({ top: 10 })
-        .backgroundColor('#E8F5E9')
-        .fontColor('#2E7D32')
-        .onClick(() => {
-          this.openDashboard();
-        })
-      Button('历史记录 →')
-        .width('100%')
-        .height(44)
-        .margin({ top: 10 })
-        .backgroundColor('#E8F5E9')
-        .fontColor('#2E7D32')
-        .onClick(() => {
-          this.openHistory();
-        })
-      Row() {
-        Button('低碳任务')
-          .layoutWeight(1)
-          .height(40)
-          .fontSize(13)
-          .backgroundColor('#E8F5E9')
-          .fontColor('#2E7D32')
-          .onClick(() => {
-            this.openTasks();
-          })
-        Button('我的徽章')
-          .layoutWeight(1)
-          .height(40)
-          .fontSize(13)
-          .margin({ left: 8 })
-          .backgroundColor('#E8F5E9')
-          .fontColor('#2E7D32')
-          .onClick(() => {
-            this.openBadges();
-          })
-        Button('双碳科普')
-          .layoutWeight(1)
-          .height(40)
-          .fontSize(13)
-          .margin({ left: 8 })
-          .backgroundColor('#E8F5E9')
-          .fontColor('#2E7D32')
-          .onClick(() => {
-            this.openArticles();
-          })
-      }
-      .width('100%')
-      .margin({ top: 10 })
-      Button('数据管理 →')
-        .width('100%')
-        .height(44)
-        .margin({ top: 10 })
-        .backgroundColor('#E8F5E9')
-        .fontColor('#2E7D32')
-        .onClick(() => {
-          this.openDataManage();
-        })
-
-      Row() {
-        Text('今日记录').fontSize(17).fontWeight(FontWeight.Bold).fontColor('#263238')
-        Blank()
-        Text(String(this.records.length) + ' 条').fontSize(13).fontColor('#90A4AE')
-      }
-      .width('100%')
-      .margin({ top: 24, bottom: 8 })
-
-      if (!this.loaded) {
-        Text('加载中…').fontSize(14).fontColor('#90A4AE').margin({ top: 20 })
-      } else if (this.records.length === 0) {
-        Column() {
-          Text('今天还没有记录').fontSize(15).fontColor('#78909C')
-          Text('点击上面的按钮，记录第一件低碳小事').fontSize(12).fontColor('#B0BEC5').margin({ top: 6 })
-        }
-        .width('100%')
-        .padding(28)
-        .backgroundColor(Color.White)
-        .borderRadius(16)
-      } else {
-        Column() {
-          ForEach(this.records, (item: CarbonRecord) => {
+    Scroll() {
+      Column({ space: 16 }) {
+        // ==================== 顶部：标题 + 日期 ====================
+        Row() {
+          Column() {
+            Text('碳足迹')
+              .fontSize(32)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#1B5E20')
+              .letterSpacing(1)
             Row() {
-              Column() {
-                Text(item.itemName).fontSize(15).fontColor('#263238')
-                Text(String(item.amount) + ' ' + item.unit + ' · ' + item.recordTime.substring(11, 16))
-                  .fontSize(12)
-                  .fontColor('#90A4AE')
-                  .margin({ top: 2 })
+              Row()
+                .width(20)
+                .height(4)
+                .borderRadius(2)
+                .backgroundColor('#AED581')
+              Text(todayText())
+                .fontSize(13)
+                .fontColor('#66796A')
+                .margin({ left: 8 })
+            }
+            .margin({ top: 10 })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+
+          this.leafBadge(54)
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+        .padding({ top: 4 })
+
+        // ==================== 今日数据卡片 ====================
+        Column() {
+          Row({ space: 8 }) {
+            Column() {
+              Row() {
+                Row()
+                  .width(6)
+                  .height(6)
+                  .borderRadius(3)
+                  .backgroundColor('#66BB6A')
+                Text('今日减排')
+                  .fontSize(13)
+                  .fontColor('#5F7362')
+                  .margin({ left: 6 })
               }
-              .alignItems(HorizontalAlign.Start)
+              .alignItems(VerticalAlign.Center)
+
+              Text('≈ ' + this.todayCo2.toFixed(2))
+                .fontSize(28)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#2E7D32')
+                .margin({ top: 8 })
+                .maxLines(1)
+
+              Text('kg CO₂e · 按实际值')
+                .fontSize(11)
+                .fontColor('#6F8372')
+                .margin({ top: 4 })
+                .maxLines(1)
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
+            .padding({ left: 14, right: 10, top: 16, bottom: 16 })
+            .backgroundColor('#F1F8EC')
+            .borderRadius(18)
+
+            Column() {
+              Row() {
+                Row()
+                  .width(6)
+                  .height(6)
+                  .borderRadius(3)
+                  .backgroundColor('#F9A825')
+                Text('今日积分')
+                  .fontSize(13)
+                  .fontColor('#6E6045')
+                  .margin({ left: 6 })
+              }
+              .alignItems(VerticalAlign.Center)
+
+              Text(String(this.todayPoint))
+                .fontSize(28)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#D97706')
+                .margin({ top: 8 })
+                .maxLines(1)
+
+              Text('分')
+                .fontSize(11)
+                .fontColor('#7A6A4E')
+                .margin({ top: 4 })
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
+            .padding({ left: 14, right: 10, top: 16, bottom: 16 })
+            .backgroundColor('#FFF9EC')
+            .borderRadius(18)
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Top)
+        }
+        .width('100%')
+        .padding(8)
+        .backgroundColor(Color.White)
+        .borderRadius(24)
+        .shadow({ radius: 20, color: '#102E7D32', offsetY: 8 })
+
+        // ==================== 主操作 ====================
+        Button('+ 记录低碳行为')
+          .width('100%')
+          .height(54)
+          .fontSize(17)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .backgroundColor('#2E7D32')
+          .borderRadius(27)
+          .shadow({ radius: 18, color: '#292E7D32', offsetY: 8 })
+          .onClick(() => {
+            this.openAdd();
+          })
+
+        // ==================== 功能入口 ====================
+        Column({ space: 10 }) {
+          Row({ space: 10 }) {
+            Button('数据看板 →')
               .layoutWeight(1)
+              .height(50)
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#2E7D32')
+              .backgroundColor('#F2F8ED')
+              .borderRadius(14)
+              .onClick(() => {
+                this.openDashboard();
+              })
+            Button('历史记录 →')
+              .layoutWeight(1)
+              .height(50)
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#2E7D32')
+              .backgroundColor('#F2F8ED')
+              .borderRadius(14)
+              .onClick(() => {
+                this.openHistory();
+              })
+          }
+          .width('100%')
 
-              Column() {
-                Text(item.reduceCo2.toFixed(2) + ' kg').fontSize(14).fontColor('#2E7D32')
-                Text('+' + String(item.getPoint) + ' 分').fontSize(12).fontColor('#F9A825').margin({ top: 2 })
-              }
-              .alignItems(HorizontalAlign.End)
+          Row({ space: 10 }) {
+            Button('低碳任务')
+              .layoutWeight(1)
+              .height(50)
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#2E7D32')
+              .backgroundColor('#F2F8ED')
+              .borderRadius(14)
+              .onClick(() => {
+                this.openTasks();
+              })
+            Button('我的徽章')
+              .layoutWeight(1)
+              .height(50)
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#2E7D32')
+              .backgroundColor('#F2F8ED')
+              .borderRadius(14)
+              .onClick(() => {
+                this.openBadges();
+              })
+          }
+          .width('100%')
 
-              Text('删除')
-                .fontSize(12)
-                .fontColor('#C62828')
-                .padding({ left: 12, top: 8, bottom: 8 })
+          Row({ space: 10 }) {
+            Button('双碳科普')
+              .layoutWeight(1)
+              .height(50)
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#2E7D32')
+              .backgroundColor('#F2F8ED')
+              .borderRadius(14)
+              .onClick(() => {
+                this.openArticles();
+              })
+            Button('数据管理 →')
+              .layoutWeight(1)
+              .height(50)
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#2E7D32')
+              .backgroundColor('#F2F8ED')
+              .borderRadius(14)
+              .onClick(() => {
+                this.openDataManage();
+              })
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding(10)
+        .backgroundColor(Color.White)
+        .borderRadius(22)
+        .shadow({ radius: 20, color: '#0D2E7D32', offsetY: 8 })
+
+        // ==================== 今日记录 ====================
+        Row() {
+          Text('今日记录')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#263238')
+          Blank()
+          Text(String(this.records.length) + ' 条')
+            .fontSize(12)
+            .fontColor('#4F6B52')
+            .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+            .backgroundColor('#E8F3E1')
+            .borderRadius(12)
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+        .margin({ top: 8 })
+
+        if (!this.loaded) {
+          Column() {
+            Text('加载中…')
+              .fontSize(14)
+              .fontColor('#5F7462')
+          }
+          .width('100%')
+          .padding({ top: 28, bottom: 28 })
+          .backgroundColor(Color.White)
+          .borderRadius(22)
+        } else if (this.records.length === 0) {
+          Column() {
+            this.leafBadge(64)
+            Text('今天还没有记录')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#5F7462')
+              .margin({ top: 14 })
+            Text('点击上面的按钮，记录第一件低碳小事')
+              .fontSize(12)
+              .fontColor('#66796A')
+              .margin({ top: 6 })
+              .textAlign(TextAlign.Center)
+          }
+          .width('100%')
+          .padding({ top: 30, bottom: 30, left: 20, right: 20 })
+          .backgroundColor(Color.White)
+          .borderRadius(22)
+        } else {
+          Column() {
+            ForEach(this.records, (item: CarbonRecord, index: number) => {
+              Row() {
+                Row()
+                  .width(4)
+                  .height(36)
+                  .borderRadius(2)
+                  .backgroundColor('#C8E6C9')
+                  .margin({ right: 12 })
+
+                Column() {
+                  Text(item.itemName)
+                    .fontSize(15)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor('#263238')
+                  Text(String(item.amount) + ' ' + item.unit + ' · ' + item.recordTime.substring(11, 16))
+                    .fontSize(12)
+                    .fontColor('#66796A')
+                    .margin({ top: 4 })
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start)
+
+                Column() {
+                  Text(item.reduceCo2.toFixed(2) + ' kg')
+                    .fontSize(14)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor('#2E7D32')
+                    .maxLines(1)
+                  Text('+' + String(item.getPoint) + ' 分')
+                    .fontSize(12)
+                    .fontColor('#B45309')
+                    .margin({ top: 4 })
+                }
+                .alignItems(HorizontalAlign.End)
+                .margin({ left: 8 })
+
+                Row() {
+                  Text('删除')
+                    .fontSize(12)
+                    .fontColor('#C62828')
+                }
+                .height(32)
+                .padding({ left: 10, right: 10 })
+                .justifyContent(FlexAlign.Center)
+                .backgroundColor('#FFF3F1')
+                .borderRadius(10)
+                .margin({ left: 6 })
                 .onClick(() => {
                   this.confirmDelete(item);
                 })
-            }
-            .width('100%')
-            .padding({ top: 12, bottom: 12 })
-            .border({ width: { bottom: 1 }, color: '#F0F0F0' })
-          }, (item: CarbonRecord) => String(item.id))
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Center)
+              .padding({ top: 12, bottom: 12 })
+              .border({ width: { bottom: index === this.records.length - 1 ? 0 : 1 }, color: '#EFF4EB' })
+            }, (item: CarbonRecord) => String(item.id))
+          }
+          .width('100%')
+          .padding({ left: 16, right: 12, top: 4, bottom: 4 })
+          .backgroundColor(Color.White)
+          .borderRadius(22)
+          .shadow({ radius: 16, color: '#0A2E7D32', offsetY: 6 })
         }
-        .width('100%')
-        .padding({ left: 16, right: 16 })
-        .backgroundColor(Color.White)
-        .borderRadius(16)
       }
+      .width('100%')
+      .padding({ left: 20, right: 20, top: 24, bottom: 32 })
+      .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 20, right: 20, top: 24, bottom: 20 })
-    .backgroundColor('#F1F3F5')
-    .alignItems(HorizontalAlign.Start)
+    .backgroundColor('#F4F8F1')
+    .scrollBar(BarState.Off)
   }
 }
