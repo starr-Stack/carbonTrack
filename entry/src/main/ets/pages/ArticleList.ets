@@ -181,10 +181,10 @@ struct ArticleList {
 
   /** 标签文字色：按主题区分，方便用户扫读 */
   private tagColor(tag: string): string {
-    if (tag === '核算科普') {
+    if (tag === '核算方法') {
       return '#1565C0';
     }
-    if (tag === '政策与市场') {
+    if (tag === '机制说明') {
       return '#EF6C00';
     }
     return COLOR_PRIMARY;
@@ -192,10 +192,10 @@ struct ArticleList {
 
   /** 标签底色 */
   private tagBg(tag: string): string {
-    if (tag === '核算科普') {
+    if (tag === '核算方法') {
       return '#E3F2FD';
     }
-    if (tag === '政策与市场') {
+    if (tag === '机制说明') {
       return '#FFF3E0';
     }
     return COLOR_PRIMARY_LIGHT;
@@ -278,26 +278,35 @@ struct ArticleList {
       .width('100%')
       .padding({ top: 12, bottom: 12 })
 
-      // 栏目标题卡
+      // 栏目标题卡：顶部配图 + 文案
       Column() {
-        Text('双碳科普')
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(COLOR_PRIMARY)
-        Text('从概念到算法，再到政策：把碳中和讲成人话')
-          .fontSize(12)
-          .fontColor(COLOR_TEXT)
-          .margin({ top: 6 })
-        Text('共 ' + this.articles.length + ' 篇 · 每篇约 3~5 分钟')
-          .fontSize(11)
-          .fontColor(COLOR_MUTED)
-          .margin({ top: 10 })
+        Image($r('app.media.ic_knowledge_banner'))
+          .width('100%')
+          .height(126)
+          .objectFit(ImageFit.Cover)
+
+        Column() {
+          Text('双碳科普')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(COLOR_PRIMARY)
+          Text('政策依据、核算方法、市场机制，按官方口径梳理')
+            .fontSize(12)
+            .fontColor(COLOR_TEXT)
+            .margin({ top: 6 })
+          Text('共 ' + this.articles.length + ' 篇 · 每篇约 3~5 分钟')
+            .fontSize(11)
+            .fontColor(COLOR_MUTED)
+            .margin({ top: 10 })
+        }
+        .width('100%')
+        .padding({ left: 18, right: 18, top: 14, bottom: 18 })
+        .alignItems(HorizontalAlign.Start)
       }
       .width('100%')
-      .padding(18)
       .backgroundColor(COLOR_CARD)
       .borderRadius(16)
-      .alignItems(HorizontalAlign.Start)
+      .clip(true)
 
       // 内容区
       if (this.loadState === 0) {

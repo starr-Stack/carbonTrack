@@ -83,16 +83,28 @@ struct TreeCertificate {
     return this.totalCo2 >= CERT_THRESHOLD;
   }
 
+  /**
+   * 当前这棵树的已累计量（0 ~ KG_PER_TREE）。
+   * 18.3 在浮点下不精确，直接取模在「正好整数棵」时会得到两种残差：
+   * 54.9 % 18.3 = 18.3（界面显示还差 0.00 kg），而 18.3 % 18.3 = 0。
+   * 先算整棵数再相减，可以消掉这层误差。
+   */
+  private treePart(): number {
+    const trees: number = Math.floor(this.totalCo2 / KG_PER_TREE + 1e-9);
+    const part: number = this.totalCo2 - trees * KG_PER_TREE;
+    return Math.min(KG_PER_TREE, Math.max(0, Math.round(part * 100) / 100));
+  }
+
   /** 距离下一棵树还差多少 kg */
   private remainToNext(): number {
-    const remain: number = KG_PER_TREE - (this.totalCo2 % KG_PER_TREE);
+    const part: number = this.treePart();
+    const remain: number = part > 0 ? KG_PER_TREE - part : KG_PER_TREE;
     return Math.round(remain * 100) / 100;
   }
 
   /** 当前这棵树的进度百分比 0~100 */
   private treePercent(): number {
-    const part: number = this.totalCo2 % KG_PER_TREE;
-    const percent: number = Math.round(part / KG_PER_TREE * 100);
+    const percent: number = Math.round(this.treePart() / KG_PER_TREE * 100);
     return percent > 100 ? 100 : percent;
   }
 
@@ -143,190 +155,90 @@ struct TreeCertificate {
   /* ============================ UI ============================ */
 
   /** 证书主体：渐变描边 + 白色内页 */
+  /** 证书主体：奖状版式（双线边框 + 四角落款 + 印章） */
+  /** 证书主体：金框证书底板 + 叠加文字（文字落在模板中间的空白区） */
   @Builder
   CertificateBody() {
-    Column() {
+    Stack({ alignContent: Alignment.Top }) {
+      // 证书底板：荣誉证书模板（含标题与金色印章）
+      Image($r('app.media.ic_cert_frame'))
+        .width('100%')
+        .objectFit(ImageFit.Contain)
+
+      // 叠加文字：对应模板中间的空白区域
       Column() {
-        // 顶部英文小字，作为证书的版式装饰
-        Text('CARBON FOOTPRINT · TREE PLANTING')
-          .fontSize(10)
-          .fontColor(COLOR_MUTED)
+        Text('植 树 证 书 · TREE PLANTING')
+          .fontSize(9)
+          .fontColor('#8D6E63')
+          .letterSpacing(1)
 
-        Text('植树证书')
-          .fontSize(26)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(COLOR_PRIMARY_DEEP)
-          .margin({ top: 6 })
+        Text('兹 证 明')
+          .fontSize(11)
+          .fontColor('#6D4C41')
+          .letterSpacing(1)
+          .margin({ top: 12 })
 
-        // 分隔线：短线 + 叶片 + 短线
-        Row() {
-          Text('')
-            .width(36)
-            .height(1)
-            .backgroundColor('#C8E6C9')
-          Text('🌿')
-            .fontSize(12)
-            .margin({ left: 8, right: 8 })
-          Text('')
-            .width(36)
-            .height(1)
-            .backgroundColor('#C8E6C9')
-        }
-        .alignItems(VerticalAlign.Center)
-        .margin({ top: 12 })
-
-        // 树形图标
-        Column() {
-          Text('🌳')
-            .fontSize(46)
-        }
-        .width(88)
-        .height(88)
-        .justifyContent(FlexAlign.Center)
-        .backgroundColor(COLOR_PRIMARY_LIGHT)
-        .borderRadius(44)
-        .margin({ top: 16 })
-
-        Text('兹证明')
-          .fontSize(13)
-          .fontColor(COLOR_TEXT)
-          .margin({ top: 18 })
-
-        Text('碳足迹用户')
-          .fontSize(18)
+        Text('碳 足 迹 用 户')
+          .fontSize(16)
           .fontWeight(FontWeight.Medium)
-          .fontColor(COLOR_TITLE)
-          .margin({ top: 6 })
+          .fontColor('#3E2723')
+          .letterSpacing(1)
+          .margin({ top: 8 })
 
-        Text('在本应用累计减排')
-          .fontSize(13)
-          .fontColor(COLOR_TEXT)
-          .margin({ top: 14 })
+        Text('截 至 ' + this.todayText() + ' 累 计 减 排')
+          .fontSize(10)
+          .fontColor('#5D4037')
+          .margin({ top: 12 })
 
         Row() {
           Text(this.totalCo2.toFixed(2))
-            .fontSize(34)
+            .fontSize(26)
             .fontWeight(FontWeight.Bold)
-            .fontColor(COLOR_PRIMARY)
+            .fontColor('#2E7D32')
           Text(' kg CO₂e')
-            .fontSize(12)
-            .fontColor(COLOR_MUTED)
-            .margin({ left: 4, bottom: 6 })
+            .fontSize(9)
+            .fontColor('#795548')
+            .margin({ left: 3, bottom: 4 })
         }
         .alignItems(VerticalAlign.Bottom)
-        .margin({ top: 4 })
+        .margin({ top: 2 })
 
-        Text('约等于种下 ' + this.treeCount().toFixed(2) + ' 棵树的年固碳量')
+        Text('折 合 植 树 ' + this.treeCount().toFixed(2) + ' 棵')
           .fontSize(12)
-          .fontColor(COLOR_TEXT)
-          .margin({ top: 8 })
+          .fontColor('#33691E')
+          .letterSpacing(1)
+          .margin({ top: 10 })
 
-        Divider()
-          .color(COLOR_LINE)
-          .margin({ top: 18, bottom: 12 })
-
-        // 底部三列摘要
-        Row() {
-          Column() {
-            Text('累计减排')
-              .fontSize(11)
-              .fontColor(COLOR_MUTED)
-            Text(this.totalCo2.toFixed(2))
-              .fontSize(16)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(COLOR_PRIMARY)
-              .margin({ top: 2 })
-            Text('kg')
-              .fontSize(10)
-              .fontColor(COLOR_HINT)
-          }
-          .layoutWeight(1)
-
-          Column() {
-            Text('折合棵数')
-              .fontSize(11)
-              .fontColor(COLOR_MUTED)
-            Text(this.treeCount().toFixed(2))
-              .fontSize(16)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(COLOR_GOLD)
-              .margin({ top: 2 })
-            Text('棵')
-              .fontSize(10)
-              .fontColor(COLOR_HINT)
-          }
-          .layoutWeight(1)
-
-          Column() {
-            Text('发证日期')
-              .fontSize(11)
-              .fontColor(COLOR_MUTED)
-            Text(this.todayText().substring(5))
-              .fontSize(16)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(COLOR_TITLE)
-              .margin({ top: 2 })
-            Text(String(new Date().getFullYear()))
-              .fontSize(10)
-              .fontColor(COLOR_HINT)
-          }
-          .layoutWeight(1)
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Top)
-
-        // 编号与印章
-        Row() {
-          Column() {
-            Text('证书编号')
-              .fontSize(10)
-              .fontColor(COLOR_HINT)
-            Text(this.certNo())
-              .fontSize(11)
-              .fontColor(COLOR_TEXT)
-              .margin({ top: 2 })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-
-          // 印章：红色圆环 + 两行字，整体轻微旋转，模拟盖章效果
-          Column() {
-            Text('碳足迹')
-              .fontSize(9)
-              .fontColor(COLOR_SEAL)
-            Text('低碳先锋')
-              .fontSize(9)
-              .fontColor(COLOR_SEAL)
-              .margin({ top: 1 })
-          }
-          .width(58)
-          .height(58)
-          .justifyContent(FlexAlign.Center)
-          .border({ width: 2, color: COLOR_SEAL })
-          .borderRadius(29)
-          .rotate({ angle: -12 })
-          .opacity(0.85)
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Bottom)
-        .margin({ top: 18 })
+        Text('特 发 此 证')
+          .fontSize(10)
+          .fontColor('#5D4037')
+          .margin({ top: 10 })
       }
       .width('100%')
-      .padding({ left: 20, right: 20, top: 22, bottom: 18 })
-      .backgroundColor(COLOR_CARD)
-      .borderRadius(18)
+      .padding({ left: 52, right: 52, top: 158 })
       .alignItems(HorizontalAlign.Center)
+
     }
     .width('100%')
-    .padding(3)
-    .linearGradient({
-      angle: 135,
-      colors: [['#2E7D32', 0.0], ['#A5D6A7', 1.0]]
-    })
-    .borderRadius(21)
+    .borderRadius(10)
+    .clip(true)
+
+    // 编号与日期放在证书下方，避免压在模板的红色缎带上
+    Row() {
+      Text('证书编号 ' + this.certNo())
+        .fontSize(9)
+        .fontColor(COLOR_HINT)
+      Blank()
+      Text('颁发日期 ' + this.todayText())
+        .fontSize(9)
+        .fontColor(COLOR_HINT)
+    }
+    .width('100%')
+    .padding({ left: 4, right: 4 })
+    .margin({ top: 10 })
   }
 
-  /** 未达发证线时的提示卡 */
+
   @Builder
   NotYetBody() {
     Column() {
@@ -440,7 +352,7 @@ struct TreeCertificate {
               .width('100%')
 
               Progress({
-                value: this.totalCo2 % KG_PER_TREE,
+                value: this.treePart(),
                 total: KG_PER_TREE,
                 type: ProgressType.Linear
               })
