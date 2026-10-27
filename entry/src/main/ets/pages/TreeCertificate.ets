@@ -83,16 +83,28 @@ struct TreeCertificate {
     return this.totalCo2 >= CERT_THRESHOLD;
   }
 
+  /**
+   * 当前这棵树的已累计量（0 ~ KG_PER_TREE）。
+   * 18.3 在浮点下不精确，直接取模在「正好整数棵」时会得到两种残差：
+   * 54.9 % 18.3 = 18.3（界面显示还差 0.00 kg），而 18.3 % 18.3 = 0。
+   * 先算整棵数再相减，可以消掉这层误差。
+   */
+  private treePart(): number {
+    const trees: number = Math.floor(this.totalCo2 / KG_PER_TREE + 1e-9);
+    const part: number = this.totalCo2 - trees * KG_PER_TREE;
+    return Math.min(KG_PER_TREE, Math.max(0, Math.round(part * 100) / 100));
+  }
+
   /** 距离下一棵树还差多少 kg */
   private remainToNext(): number {
-    const remain: number = KG_PER_TREE - (this.totalCo2 % KG_PER_TREE);
+    const part: number = this.treePart();
+    const remain: number = part > 0 ? KG_PER_TREE - part : KG_PER_TREE;
     return Math.round(remain * 100) / 100;
   }
 
   /** 当前这棵树的进度百分比 0~100 */
   private treePercent(): number {
-    const part: number = this.totalCo2 % KG_PER_TREE;
-    const percent: number = Math.round(part / KG_PER_TREE * 100);
+    const percent: number = Math.round(this.treePart() / KG_PER_TREE * 100);
     return percent > 100 ? 100 : percent;
   }
 
@@ -340,7 +352,7 @@ struct TreeCertificate {
               .width('100%')
 
               Progress({
-                value: this.totalCo2 % KG_PER_TREE,
+                value: this.treePart(),
                 total: KG_PER_TREE,
                 type: ProgressType.Linear
               })
