@@ -21,6 +21,12 @@ function todayText(): string {
   return now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate());
 }
 
+/** 右上角大字用的短日期：MM/dd */
+function monthDayText(): string {
+  const now: Date = new Date();
+  return pad2(now.getMonth() + 1) + '/' + pad2(now.getDate());
+}
+
 @Entry
 @Component
 struct Index {
@@ -224,29 +230,26 @@ struct Index {
       Column({ space: 16 }) {
         // ==================== 顶部：标题 + 日期 ====================
         Row() {
-          Column() {
-            Text('碳足迹')
-              .fontSize(32)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#1B5E20')
-              .letterSpacing(1)
-            Row() {
-              Row()
-                .width(20)
-                .height(4)
-                .borderRadius(2)
-                .backgroundColor('#AED581')
-              Text(todayText())
-                .fontSize(13)
-                .fontColor('#66796A')
-                .margin({ left: 8 })
-            }
-            .margin({ top: 10 })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
+          Text('碳足迹')
+            .fontSize(32)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#1B5E20')
+            .letterSpacing(1)
+            .layoutWeight(1)
 
-          this.leafBadge(54)
+          // 日期移到右上角：月/日大字 + 年份小字
+          Column() {
+            Text(monthDayText())
+              .fontSize(26)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#2E7D32')
+              .letterSpacing(1)
+            Text(String(new Date().getFullYear()))
+              .fontSize(11)
+              .fontColor('#7A8F7C')
+              .margin({ top: 2 })
+          }
+          .alignItems(HorizontalAlign.End)
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
