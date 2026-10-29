@@ -144,11 +144,16 @@ struct Dashboard {
     }
   };
 
-  /** 饼图数值标签：取整并加百分号 */
+  /** 饼图数值标签：传进来的已经是百分比整数，只补一个百分号 */
   private pieValueFormatter: IValueFormatter = {
     getFormattedValue: (value: number, entry: EntryOhos, dataSetIndex: number,
       viewPortHandler: ViewPortHandler): string => {
-      return String(Math.round(value)) + '%';
+      const percent: number = Math.round(value);
+      // 占比不足 1% 的扇区角度几乎为 0，标签会挤在别的扇区上，看起来像“数字错了”
+      if (percent <= 0) {
+        return '';
+      }
+      return String(percent) + '%';
     }
   };
 
@@ -268,7 +273,9 @@ struct Dashboard {
       legend.setEnabled(false);
     }
 
-    this.pieModel.setUsePercentValues(true); // 扇区显示百分比
+    // 扇区数值直接使用页面算好的百分比（见 rebuildPieData），关掉图表自己的归一化，
+    // 否则图表按 kg 再算一遍、图例按 kg 先算再修正，两边四舍五入后会差 1%
+    this.pieModel.setUsePercentValues(false);
     this.pieModel.setDrawEntryLabels(false); // 不在扇区上画名称，避免拥挤
     this.pieModel.setHoleRadius(0);          // 实心饼图
     this.pieModel.setTransparentCircleRadius(0);
@@ -400,7 +407,8 @@ struct Dashboard {
     const entries: JArrayList<PieEntry> = new JArrayList<PieEntry>();
     const colors: number[] = [];
     for (const item of this.pieData) {
-      entries.add(new PieEntry(item.value, item.name));
+      // 传百分比而不是 kg：扇区标注与下方图例用的是同一个整数，天然一致
+      entries.add(new PieEntry(item.percent, item.name));
       colors.push(this.pieColorOf(item.name));
     }
 
@@ -411,6 +419,7 @@ struct Dashboard {
     dataSet.setValueFormatter(this.pieValueFormatter);
     dataSet.setSliceSpace(2);
 
+    hilog.info(LOG_DOMAIN, LOG_TAG, 'pie percents: %{public}s', JSON.stringify(this.pieData));
     const pieData: PieData = new PieData(dataSet);
     this.pieModel.setData(pieData);
     this.pieModel.notifyDataSetChanged();
@@ -625,7 +634,9 @@ struct Dashboard {
                       .margin({ left: 4 })
                   }
                   .margin({ right: 12, top: 6 })
-                }, (item: PieItem) => item.name)
+                // key 必须带上数值：只按 name 做 key 时 ArkUI 会复用旧节点，
+                // 切换日/周/月后圆点还在、百分比却不刷新，图例就会和饼图对不上
+                }, (item: PieItem) => item.name + '|' + item.percent + '|' + item.value)
               }
               .width('100%')
               .margin({ top: 4 })
@@ -677,7 +688,7 @@ struct Dashboard {
                 .width('100%')
                 .padding({ top: 8, bottom: 8 })
                 .border({ width: { bottom: 1 }, color: '#F0F0F0' })
-              }, (item: TrendItem) => item.label)
+              }, (item: TrendItem) => item.label + '|' + item.value + '|' + item.point)
             }
           }
           .width('100%')
