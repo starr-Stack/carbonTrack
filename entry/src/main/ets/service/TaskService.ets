@@ -47,6 +47,8 @@ export interface ClaimResult {
   capped: boolean;
   /** 该任务之前已经领过 */
   alreadyClaimed: boolean;
+  /** 进度未达标，本次拒绝发放（领奖必须满足条件） */
+  notQualified: boolean;
 }
 
 export class TaskService {
@@ -106,16 +108,31 @@ export class TaskService {
    * @returns 领取结果；失败时 awarded 为 0
    */
   public static async claimReward(taskId: string, taskName: string,
-    rewardPoint: number): Promise<ClaimResult> {
+    rewardPoint: number, taskType: string, targetValue: number): Promise<ClaimResult> {
     const failed: ClaimResult = {
       success: false,
       awarded: 0,
       capped: false,
-      alreadyClaimed: false
+      alreadyClaimed: false,
+      notQualified: false
     };
     if (!DBUtil.isReady() || taskId.length === 0 || rewardPoint <= 0) {
       hilog.warn(LOG_DOMAIN, LOG_TAG, 'claim skipped: invalid args');
       return failed;
+    }
+    // 领奖前置校验：进度没达标一律不发（服务层兜底，页面按钮只是第一道门）
+    const progress: TaskProgress = await TaskService.getProgress(taskType, targetValue);
+    if (progress.current < progress.target) {
+      hilog.info(LOG_DOMAIN, LOG_TAG, 'claim refused, progress %{public}s/%{public}s: %{public}s',
+        String(progress.current), String(progress.target), taskId);
+      const notMet: ClaimResult = {
+        success: false,
+        awarded: 0,
+        capped: false,
+        alreadyClaimed: false,
+        notQualified: true
+      };
+      return notMet;
     }
 
     let alreadyClaimed: boolean = false;
@@ -157,7 +174,8 @@ export class TaskService {
       success: success,
       awarded: success ? rewardPoint : 0,
       capped: capped,
-      alreadyClaimed: alreadyClaimed
+      alreadyClaimed: alreadyClaimed,
+      notQualified: false
     };
   }
 

@@ -10,18 +10,17 @@
  *      这里不手写 INSERT，避免出现"有明细没汇总"的脏数据；
  *   3. 减排量用 CarbonCalculator 的因子实时计算，不写死数值，因子库调整后示例数据自动跟着变；
  *   4. 随机数用固定种子的 Lehmer 生成器，每次载入生成的数据完全一致，演示可复现；
- *   5. seed() 开头先 clearAll()，重复点击不会产生重复记录。
+ *   5. seed() 开头先 clearAll()，重复点击不会产生重复记录；
+ *   6. 不代领任务奖励：任务页的「领取积分」是唯一入口，且进度达标才允许领取。
  */
 
 import { common } from '@kit.AbilityKit';
-import { util } from '@kit.ArkTS';
 import { relationalStore as rdb } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { TABLE, CarbonRecord } from '../model/TableType';
 import { DBUtil } from '../common/DBUtil';
 import { AppState } from '../model/AppState';
 import { CarbonCalculator, CalcResult, Category, FactorItem } from '../utils/CarbonCalculator';
-import { TaskService, ClaimResult } from './TaskService';
 
 const LOG_DOMAIN: number = 0x3200;
 const LOG_TAG: string = 'DemoDataService';
@@ -33,8 +32,7 @@ const RECORD_COUNT: number = 40;
 const SPAN_DAYS: number = 84;
 /** 一天毫秒数 */
 const DAY_MS: number = 86400000;
-/** 模拟领奖的任务数（每枚徽章绑一个任务，领 2 个任务即解锁 2 枚徽章） */
-const CLAIM_COUNT: number = 2;
+
 /** 参与示例数据的最大单位因子：高于它的行为（换 LED、换家电等）单条就是几十公斤，不符合个人三个月的量级 */
 const LIGHT_ITEM_MAX_FACTOR: number = 3;
 /** 单条记录的数量上限，避免"500 升水"这类极端值 */
@@ -51,18 +49,10 @@ const RECENT_RECORDS: number = 12;
 export interface DemoSeedResult {
   /** 实际写入的记录条数 */
   records: number;
-  /** 模拟的领奖次数（决定解锁几枚徽章） */
-  claims: number;
   /** 写入记录的减排量合计 kgCO2e */
   co2: number;
 }
 
-/** task_init.json 中本服务用到的字段（配置 DTO，非数据库实体） */
-interface TaskSeedItem {
-  taskId?: string;
-  taskName?: string;
-  rewardPoint?: number;
-}
 
 /** Lehmer 随机数生成器的状态容器 */
 interface Rng {
@@ -72,9 +62,9 @@ interface Rng {
 export class DemoDataService {
   /**
    * 载入示例数据。
-   * 流程：清空 → 模拟 2 次领奖（解锁 2 枚徽章）→ 按因子库生成 40 条记录铺在最近 84 天。
-   * 先领奖再写记录，是为了避开每日积分上限：领奖时"今日已得"还是 0，两笔奖励必然发放。
-   * @param context 页面上下文，用于读取 rawfile/task_init.json
+   * 流程：清空 → 按因子库生成 40 条记录铺在最近 84 天 → 回填今日积分缓存。
+   * 不模拟领奖：任务奖励全部留给用户按进度自己领取，避免"没做任务却已领奖"的假状态。
+   * @param context 页面上下文，用于初始化碳因子库
    */
   public static async seed(context: common.Context): Promise<DemoSeedResult> {
     if (!DBUtil.isReady()) {
@@ -86,27 +76,11 @@ export class DemoDataService {
       throw new Error('清空旧数据失败');
     }
 
-    // ① 模拟领奖：任务页显示"已领取"，徽章页据此解锁
-    let claims: number = 0;
-    const tasks: TaskSeedItem[] = DemoDataService.readTasks(context);
-    for (const task of tasks) {
-      if (claims >= CLAIM_COUNT) {
-        break;
-      }
-      const taskId: string = task.taskId ?? '';
-      const rewardPoint: number = task.rewardPoint ?? 0;
-      if (taskId.length === 0 || rewardPoint <= 0) {
-        continue;
-      }
-      const claim: ClaimResult = await TaskService.claimReward(taskId, task.taskName ?? taskId, rewardPoint);
-      if (claim.success) {
-        claims += 1;
-      } else if (claim.capped) {
-        hilog.warn(LOG_DOMAIN, LOG_TAG, 'claim capped: %{public}s', taskId);
-      }
-    }
+    // 今天写进库的积分（只算今天的记录），用于结束后回填 AppState 的今日积分缓存。
+    // 任务奖励不在这里发放：任务页「领取积分」是唯一入口，且进度达标才允许领取。
+    let todayPoint: number = 0;
 
-    // ② 生成减碳记录
+    // 生成减碳记录
     const calc: CarbonCalculator = CarbonCalculator.getInstance();
     if (!calc.isReady()) {
       await calc.init(context);
@@ -165,19 +139,25 @@ export class DemoDataService {
       if (id > 0) {
         records += 1;
         co2 += calcResult.reduceCo2;
+        // 只有落在今天的记录才计入今日积分（示例数据大部分在历史日期）
+        if (record.recordTime.startsWith(AppState.todayKey())) {
+          todayPoint += calcResult.getPoint;
+        }
       }
     }
 
-    // 今日积分缓存按新数据重算
+    // 今日积分缓存按新数据重算：
+    // loadTodayPoint() 只在跨天时清零，同一天会直接返回，不会把刚写进库的积分带回缓存，
+    // 所以这里必须显式回填；否则首页「今日积分」一直是 0，与今日减排、日汇总表对不上。
     AppState.loadTodayPoint();
+    AppState.setTodayEarnPoint(todayPoint);
 
     const result: DemoSeedResult = {
       records: records,
-      claims: claims,
       co2: Math.round(co2 * 100) / 100
     };
-    hilog.info(LOG_DOMAIN, LOG_TAG, 'seeded: %{public}d records, %{public}d claims, co2=%{public}s',
-      records, claims, String(result.co2));
+    hilog.info(LOG_DOMAIN, LOG_TAG, 'seeded: %{public}d records, co2=%{public}s',
+      records, String(result.co2));
     return result;
   }
 
@@ -208,20 +188,6 @@ export class DemoDataService {
     return ok;
   }
 
-  /** 读取 task_init.json（读不到时返回空数组，不影响记录写入） */
-  private static readTasks(context: common.Context): TaskSeedItem[] {
-    try {
-      const bytes: Uint8Array = context.resourceManager.getRawFileContentSync('task_init.json');
-      const decoder: util.TextDecoder = util.TextDecoder.create('utf-8', { ignoreBOM: true });
-      const text: string = decoder.decodeToString(bytes);
-      const parsed: TaskSeedItem[] = JSON.parse(text) as TaskSeedItem[];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (err) {
-      hilog.warn(LOG_DOMAIN, LOG_TAG, 'read task_init.json failed: %{public}s',
-        DemoDataService.describe(err));
-      return [];
-    }
-  }
 
   /**
    * Lehmer 随机数（state = state * 16807 % 2147483647）。

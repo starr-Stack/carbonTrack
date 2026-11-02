@@ -218,8 +218,8 @@ struct DataManage {
     this.status = '正在写入示例数据…';
     try {
       const result: DemoSeedResult = await DemoDataService.seed(context);
-      this.status = '示例数据已载入：' + String(result.records) + ' 条记录、' +
-        String(result.claims) + ' 次领奖，累计减排 ' + result.co2.toFixed(2) + ' kg';
+      this.status = '示例数据已载入：' + String(result.records) + ' 条记录，累计减排 ' +
+        result.co2.toFixed(2) + ' kg（任务奖励请在「低碳任务」按进度领取）';
       this.toast('示例数据已载入');
     } catch (err) {
       const message: string = err instanceof Error ? err.message : String(err);
@@ -353,7 +353,7 @@ struct DataManage {
               .fontSize(16)
               .fontWeight(FontWeight.Bold)
               .fontColor('#263238')
-            Text('写入 40 条跨 3 个月的示例记录（含 2 次领奖），让看板、证书、徽章都有内容；也可以一键清空回到初始状态。')
+            Text('写入 40 条跨 3 个月的示例记录，让看板、证书、任务进度都有内容；任务奖励不代领，需在任务页进度达标后自己领取，也可以一键清空回到初始状态。')
               .fontSize(12)
               .fontColor('#607D8B')
               .margin({ top: 6, bottom: 12 })
