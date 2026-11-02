@@ -209,7 +209,13 @@ struct TaskList {
     if (task.status !== STATUS_DONE || this.isClaimed(task.taskId)) {
       return;
     }
-    const result: ClaimResult = await TaskService.claimReward(task.taskId, task.taskName, task.rewardPoint);
+    const result: ClaimResult = await TaskService.claimReward(task.taskId, task.taskName,
+      task.rewardPoint, task.taskType, task.target);
+    if (result.notQualified) {
+      this.toast('任务还没完成，达成条件后才能领取');
+      await this.loadTasks();
+      return;
+    }
     if (result.alreadyClaimed) {
       this.toast('该任务已经领取过');
       await this.loadTasks();
